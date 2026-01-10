@@ -1,0 +1,32 @@
+apiVersion: airforce.airforce.mil/v1alpha1
+kind: MissionStage
+metadata:
+  labels:
+    app.kubernetes.io/name: missionstage
+    app.kubernetes.io/instance: missionstage-sample
+    app.kubernetes.io/part-of: airforce-mission-system
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: airforce-mission-system
+  name: missionstage-sample
+spec:
+  missionRef:
+    name: mission-sample
+  stageName: "侦察"
+  stageIndex: 1
+  stageType: sequential
+  flightTasks:
+    - name: ft-kj500-001
+      aircraft: kj500
+      role: awacs-control
+      priority: critical
+      weaponLoadout:
+        - weapon: aesa-radar
+          quantity: 1
+      taskParams:
+        altitude: "8000m"
+        speed: "450km/h"
+  config:
+    synchronization:
+      waitForAll: false
+      checkpoint: "target-in-sight"
+    timeout: 30m

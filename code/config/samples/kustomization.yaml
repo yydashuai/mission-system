@@ -1,0 +1,7 @@
+## Append samples of your project ##
+resources:
+- airforce_v1alpha1_mission.yaml
+- airforce_v1alpha1_missionstage.yaml
+- airforce_v1alpha1_flighttask.yaml
+- airforce_v1alpha1_weapon.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

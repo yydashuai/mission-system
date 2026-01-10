@@ -1,0 +1,110 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - flighttasks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - flighttasks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - flighttasks/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - missions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - missions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - missions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - missionstages
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - missionstages/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - missionstages/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - weapons
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - weapons/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - weapons/status
+  verbs:
+  - get
+  - patch
+  - update

@@ -1,0 +1,40 @@
+apiVersion: airforce.airforce.mil/v1alpha1
+kind: Mission
+metadata:
+  labels:
+    app.kubernetes.io/name: mission
+    app.kubernetes.io/instance: mission-sample
+    app.kubernetes.io/part-of: airforce-mission-system
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: airforce-mission-system
+  name: mission-sample
+spec:
+  missionName: "demo-mission"
+  missionType: strike
+  priority: high
+  objective:
+    targetArea: "demo-area"
+    targetCoordinates:
+      latitude: "28.5"
+      longitude: "122.3"
+    targetDescription: "demo-target"
+  stages:
+    - name: stage1-isr
+      displayName: "侦察"
+      type: sequential
+    - name: stage2-strike
+      displayName: "打击"
+      type: parallel
+      dependsOn: ["stage1-isr"]
+  config:
+    failurePolicy:
+      maxRetries: 3
+      retryStrategy: exponential
+      stageFailureAction: abort
+    cancellationPolicy:
+      gracePeriod: 300s
+      cleanup: true
+    coordination:
+      dataLinkProtocol: "Link-16"
+      commandFrequency: "UHF-243MHz"
+      emergencyFrequency: "121.5MHz"

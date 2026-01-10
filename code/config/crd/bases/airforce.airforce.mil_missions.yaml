@@ -1,0 +1,180 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: missions.airforce.airforce.mil
+spec:
+  group: airforce.airforce.mil
+  names:
+    kind: Mission
+    listKind: MissionList
+    plural: missions
+    singular: mission
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Mission is the Schema for the missions API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MissionSpec defines the desired state of Mission
+            properties:
+              config:
+                properties:
+                  cancellationPolicy:
+                    properties:
+                      cleanup:
+                        type: boolean
+                      gracePeriod:
+                        type: string
+                    type: object
+                  coordination:
+                    properties:
+                      commandFrequency:
+                        type: string
+                      dataLinkProtocol:
+                        type: string
+                      emergencyFrequency:
+                        type: string
+                    type: object
+                  failurePolicy:
+                    properties:
+                      maxRetries:
+                        format: int32
+                        type: integer
+                      retryStrategy:
+                        type: string
+                      stageFailureAction:
+                        type: string
+                    type: object
+                type: object
+              missionName:
+                type: string
+              missionType:
+                enum:
+                - isr
+                - strike
+                - patrol
+                - escort
+                type: string
+              objective:
+                properties:
+                  extra:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  targetArea:
+                    type: string
+                  targetCoordinates:
+                    properties:
+                      latitude:
+                        type: string
+                      longitude:
+                        type: string
+                    type: object
+                  targetDescription:
+                    type: string
+                type: object
+              priority:
+                enum:
+                - low
+                - medium
+                - high
+                - critical
+                type: string
+              stages:
+                items:
+                  properties:
+                    dependsOn:
+                      items:
+                        type: string
+                      type: array
+                    displayName:
+                      type: string
+                    name:
+                      type: string
+                    timeout:
+                      type: string
+                    type:
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            description: MissionStatus defines the observed state of Mission
+            properties:
+              lastUpdateTime:
+                format: date-time
+                type: string
+              message:
+                type: string
+              phase:
+                enum:
+                - Pending
+                - Running
+                - Succeeded
+                - Failed
+                - Cancelled
+                type: string
+              stagesSummary:
+                items:
+                  properties:
+                    completionTime:
+                      format: date-time
+                      type: string
+                    name:
+                      type: string
+                    phase:
+                      type: string
+                    startTime:
+                      format: date-time
+                      type: string
+                  type: object
+                type: array
+              startTime:
+                format: date-time
+                type: string
+              statistics:
+                properties:
+                  failedTasks:
+                    format: int32
+                    type: integer
+                  pendingTasks:
+                    format: int32
+                    type: integer
+                  runningTasks:
+                    format: int32
+                    type: integer
+                  succeededTasks:
+                    format: int32
+                    type: integer
+                  totalFlightTasks:
+                    format: int32
+                    type: integer
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

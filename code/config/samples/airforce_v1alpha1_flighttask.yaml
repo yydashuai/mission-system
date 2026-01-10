@@ -1,0 +1,46 @@
+apiVersion: airforce.airforce.mil/v1alpha1
+kind: FlightTask
+metadata:
+  labels:
+    app.kubernetes.io/name: flighttask
+    app.kubernetes.io/instance: flighttask-sample
+    app.kubernetes.io/part-of: airforce-mission-system
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: airforce-mission-system
+  name: flighttask-sample
+spec:
+  stageRef:
+    name: stage1-isr
+  aircraftRequirement:
+    type: j20
+    minFuelLevel: 70
+    capabilities: ["stealth", "bvr-combat"]
+    requiredHardpoints: 4
+    preferredLocation: "east-sea"
+  role: air-superiority
+  taskParams:
+    altitude: "11000m"
+    speed: "900km/h"
+    missionDuration: 45m
+    operationArea:
+      center: {latitude: "28.5", longitude: "122.3"}
+      radius: "100km"
+    phases:
+      - name: ingress
+        duration: 15m
+        waypoints: ["wp1", "wp2", "wp3"]
+      - name: combat
+        duration: 20m
+        tactics: "sweep-and-clear"
+      - name: egress
+        duration: 10m
+        waypoints: ["wp4", "wp5"]
+  weaponLoadout:
+    - weaponRef:
+        name: pl15-missile
+      quantity: 4
+      mountPoints: ["hp1", "hp2", "hp3", "hp4"]
+    - weaponRef:
+        name: pl10-missile
+      quantity: 2
+      mountPoints: ["hp5", "hp6"]

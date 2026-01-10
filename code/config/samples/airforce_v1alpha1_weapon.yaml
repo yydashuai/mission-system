@@ -1,0 +1,45 @@
+apiVersion: airforce.airforce.mil/v1alpha1
+kind: Weapon
+metadata:
+  labels:
+    app.kubernetes.io/name: weapon
+    app.kubernetes.io/instance: weapon-sample
+    app.kubernetes.io/part-of: airforce-mission-system
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: airforce-mission-system
+  name: weapon-sample
+spec:
+  weaponName: "霹雳-15中远程空空导弹"
+  weaponType: air-to-air-missile
+  category: beyond-visual-range
+  specifications:
+    manufacturer: "中国航天科工集团"
+    weight: "200kg"
+    length: "4.2m"
+    diameter: "0.2m"
+    range: "200km"
+    speed: "4.0"
+    guidance: "主动雷达制导"
+    warhead: "破片杀伤"
+  image:
+    repository: registry.mil/weapons/pl15-missile
+    tag: v2.3.0
+    pullPolicy: IfNotPresent
+  resources:
+    hardpoints: 1
+    weight: 200
+    power: 0
+    cooling: low
+  compatibility:
+    aircraftTypes: ["j20", "j16", "j10c"]
+    hardpointTypes: ["internal-bay", "under-wing"]
+  container:
+    env:
+      - name: WEAPON_TYPE
+        value: "pl15"
+      - name: GUIDANCE_MODE
+        value: "active-radar"
+    ports:
+      - name: control
+        containerPort: 9001
+        protocol: TCP

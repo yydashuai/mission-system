@@ -1,0 +1,27 @@
+# permissions for end users to view weapons.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: weapon-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: airforce-mission-system
+    app.kubernetes.io/part-of: airforce-mission-system
+    app.kubernetes.io/managed-by: kustomize
+  name: weapon-viewer-role
+rules:
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - weapons
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - airforce.airforce.mil
+  resources:
+  - weapons/status
+  verbs:
+  - get
