@@ -29,6 +29,13 @@
   - 生成输出：code/config/crd/bases/airforce.airforce.mil_{missions,missionstages,flighttasks,weapons}.yaml
   - 生成输出：code/api/v1alpha1/zz_generated.deepcopy.go
 
+#### 测试与网络依赖
+- ⚠️ `make test` 在下载 envtest 工具（setup-envtest）时访问 `proxy.golang.org` 失败（connection refused）
+- ✅ 调整 Makefile：固定 `ENVTEST_VERSION` 为 `v0.17.0`（与 controller-runtime v0.17.0 对齐），减少使用 `@latest` 的外部查询
+- 运行建议（需要能访问 Go module 代理）：
+  - `GOPROXY=https://goproxy.cn,direct GOSUMDB=off make test`
+  - 若仅做编译自检：`make build`
+
 #### 实施阶段
 当前阶段: **阶段一 - 基础平台搭建（1-2个月）**
 
