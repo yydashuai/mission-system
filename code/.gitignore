@@ -20,6 +20,10 @@ go.work
 # Kubernetes Generated files - skip generated files, except for vendored files
 !vendor/**/zz_generated.*
 
+# Local Go caches (must not live under module root; controller-gen uses paths=./...).
+.gomodcache/
+.gocache/
+
 # editor and IDE paraphernalia
 .idea
 .vscode
