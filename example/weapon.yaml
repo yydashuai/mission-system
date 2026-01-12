@@ -1,0 +1,13 @@
+apiVersion: airforce.airforce.mil/v1alpha1
+kind: Weapon
+metadata:
+  name: pl-15
+spec:
+  weaponName: "PL-15"
+  weaponType: "missile"
+  image:
+    repository: "busybox"
+    tag: "1.36"
+    pullPolicy: IfNotPresent
+  compatibility:
+    aircraftTypes: ["j20"]

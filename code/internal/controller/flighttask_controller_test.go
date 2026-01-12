@@ -48,6 +48,25 @@ var _ = Describe("FlightTask Controller", func() {
 			By("creating the custom resource for the Kind FlightTask")
 			err := k8sClient.Get(ctx, typeNamespacedName, flighttask)
 			if err != nil && errors.IsNotFound(err) {
+				weapon := &airforcev1alpha1.Weapon{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pl-15",
+						Namespace: "default",
+					},
+					Spec: airforcev1alpha1.WeaponSpec{
+						WeaponName: "PL-15",
+						WeaponType: "missile",
+						Image: &airforcev1alpha1.WeaponSpecImage{
+							Repository: "example.com/weapons/pl-15",
+							Tag:        "v1",
+						},
+						Compatibility: &airforcev1alpha1.WeaponCompatibility{
+							AircraftTypes: []string{"j20"},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, weapon)).To(Succeed())
+
 				resource := &airforcev1alpha1.FlightTask{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
@@ -63,6 +82,12 @@ var _ = Describe("FlightTask Controller", func() {
 							Type: "j20",
 						},
 						Role: "air-superiority",
+						WeaponLoadout: []airforcev1alpha1.FlightTaskWeaponLoadoutItem{
+							{
+								WeaponRef: airforcev1alpha1.WeaponRef{Name: "pl-15"},
+								Quantity:  2,
+							},
+						},
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
@@ -82,6 +107,10 @@ var _ = Describe("FlightTask Controller", func() {
 			_ = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pod", Namespace: "default"}, pod)
 			_ = k8sClient.Delete(ctx, pod)
 
+			weapon := &airforcev1alpha1.Weapon{}
+			_ = k8sClient.Get(ctx, types.NamespacedName{Name: "pl-15", Namespace: "default"}, weapon)
+			_ = k8sClient.Delete(ctx, weapon)
+
 			By("Cleanup the specific resource instance FlightTask")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
@@ -99,6 +128,16 @@ var _ = Describe("FlightTask Controller", func() {
 
 			var pod corev1.Pod
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pod", Namespace: "default"}, &pod)).To(Succeed())
+			Expect(pod.Spec.Containers).NotTo(BeEmpty())
+
+			foundSidecar := false
+			for i := range pod.Spec.Containers {
+				if pod.Spec.Containers[i].Name == "weapon-pl-15" {
+					foundSidecar = true
+					break
+				}
+			}
+			Expect(foundSidecar).To(BeTrue())
 
 			var updated airforcev1alpha1.FlightTask
 			Expect(k8sClient.Get(ctx, typeNamespacedName, &updated)).To(Succeed())

@@ -1,0 +1,12 @@
+apiVersion: airforce.airforce.mil/v1alpha1
+kind: FlightTask
+metadata:
+  name: demo-flighttask-with-weapon
+spec:
+  aircraftRequirement:
+    type: j20
+  role: air-superiority
+  weaponLoadout:
+    - weaponRef:
+        name: pl-15
+      quantity: 2

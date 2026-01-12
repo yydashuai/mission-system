@@ -125,3 +125,33 @@
 - ✅ Mission Controller 将 `stages[].flightTasks` 下发到 `MissionStage.spec.flightTasks`（自动补齐缺失的 task name）
 - ✅ 更新 `Mission` CRD schema：支持 `spec.stages[].flightTasks` 字段
 - ✅ 更新示例：`code/config/samples/airforce_v1alpha1_mission.yaml` 增加 `flightTasks`，用于一键触发整条链路
+
+---
+
+### 2026-01-12
+
+#### 开发环境与生成器修复
+- ✅ 安装 envtest 工具：`make envtest`（自动下载 Go toolchain 以满足 setup-envtest 的 Go 版本要求）
+- ✅ 下载 envtest k8s 资源：`./bin/setup-envtest-latest use 1.29.0 --bin-dir ./bin -p path`
+- ✅ 修复 `make manifests` 失败：
+  - 原因：`code/.gomodcache/`（以及 `code/.gocache/`）位于 Go module 根目录下，`controller-gen paths=./...` 会扫描到缓存里的依赖源码，导致报 `missing go.sum entry`
+  - 处理：删除并从 git 里移除缓存目录，避免误提交；同时在 `.gitignore` 中忽略 `.gomodcache/` 与 `.gocache/`
+  - 处理：设置 `GOCACHE=$PWD/.gocache` 避免写入 `/root/.cache/go-build` 引起 permission denied
+- ✅ RBAC：确保 `manager-role` 包含 `core/v1 pods` 权限（用于 FlightTask Controller 在真实集群创建 Pod）
+
+#### Weapon Sidecar 注入（B）
+- ✅ FlightTask Controller：基于 `spec.weaponLoadout` 拉取 `Weapon` CR 并向执行 Pod 注入武器 sidecar（共享 `EmptyDir` 卷 `weapon-interface`）
+- ✅ 兼容性检查：按 `Weapon.spec.compatibility.aircraftTypes/hardpointTypes` 做最小校验，不满足则将 FlightTask 标记为 Failed 并写入 condition
+- ✅ 单测更新：`flighttask_controller_test.go` 增加武器注入断言（创建 Weapon + FlightTask，期望 Pod 存在 `weapon-<name>` 容器）
+
+#### 集群验证（C）
+- ✅ 部署 controller 镜像：`docker.io/woshiasher/controllers:v0.1.0`，Pod 已正常 Ready
+- ✅ 验证 Weapon sidecar 注入：
+  - `kubectl apply -f example/weapon.yaml` + `kubectl apply -f example/flighttask-with-weapon.yaml`
+  - 将 `FlightTask` status 手动 patch 为 `Scheduled` 后成功创建 Pod：`demo-flighttask-with-weapon-pod`
+  - Pod 容器包含：`task` 与 `weapon-pl-15`，并挂载共享卷：`weapon-interface`
+  - 备注：示例中 `weapon-pl-15` 使用 `busybox` 会立刻退出（Completed），因此 Pod `Ready` 可能为 False，但注入本身已验证成功
+
+#### FlightTask 自动推进（D）
+- ✅ 对“独立 FlightTask”（无 `spec.stageRef.name` 且不归属 `MissionStage`）自动从 `Pending -> Scheduled`，避免需要手动 patch status
+- ✅ 保持与 MissionStage 编排不冲突：只对独立任务生效，由 MissionStage 创建/管理的 FlightTask 仍由 MissionStage Controller 推进
