@@ -22,10 +22,24 @@ spec:
     - name: stage1-isr
       displayName: "侦察"
       type: sequential
+      flightTasks:
+        - aircraft: j20
+          role: reconnaissance
+          priority: high
+          taskParams:
+            altitude: 10000m
+            speed: 800km/h
     - name: stage2-strike
       displayName: "打击"
       type: parallel
       dependsOn: ["stage1-isr"]
+      flightTasks:
+        - aircraft: h6k
+          role: strike
+          priority: critical
+          taskParams:
+            altitude: 9000m
+            speed: 750km/h
   config:
     failurePolicy:
       maxRetries: 3

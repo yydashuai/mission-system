@@ -1,0 +1,6 @@
+./flighttask_types.go
+./groupversion_info.go
+./mission_types.go
+./missionstage_types.go
+./weapon_types.go
+./zz_generated.deepcopy.go

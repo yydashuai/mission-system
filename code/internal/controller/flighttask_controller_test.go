@@ -21,8 +21,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,10 +52,23 @@ var _ = Describe("FlightTask Controller", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
+						Labels: map[string]string{
+							"mission": "m1",
+							"stage":   "s1",
+						},
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: airforcev1alpha1.FlightTaskSpec{
+						StageRef: airforcev1alpha1.MissionStageRef{Name: "s1"},
+						AircraftRequirement: airforcev1alpha1.AircraftRequirement{
+							Type: "j20",
+						},
+						Role: "air-superiority",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				patch := client.MergeFrom(resource.DeepCopy())
+				resource.Status.Phase = airforcev1alpha1.FlightTaskPhaseScheduled
+				Expect(k8sClient.Status().Patch(ctx, resource, patch)).To(Succeed())
 			}
 		})
 
@@ -62,6 +77,10 @@ var _ = Describe("FlightTask Controller", func() {
 			resource := &airforcev1alpha1.FlightTask{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
+
+			pod := &corev1.Pod{}
+			_ = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pod", Namespace: "default"}, pod)
+			_ = k8sClient.Delete(ctx, pod)
 
 			By("Cleanup the specific resource instance FlightTask")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
@@ -77,8 +96,15 @@ var _ = Describe("FlightTask Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			var pod corev1.Pod
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pod", Namespace: "default"}, &pod)).To(Succeed())
+
+			var updated airforcev1alpha1.FlightTask
+			Expect(k8sClient.Get(ctx, typeNamespacedName, &updated)).To(Succeed())
+			Expect(updated.Status.Phase).To(Equal(airforcev1alpha1.FlightTaskPhaseRunning))
+			Expect(updated.Status.PodRef).NotTo(BeNil())
+			Expect(updated.Status.PodRef.Name).To(Equal(pod.Name))
 		})
 	})
 })

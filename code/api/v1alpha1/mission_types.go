@@ -93,6 +93,8 @@ type MissionStageTemplate struct {
 	Type        StageExecutionType `json:"type,omitempty"`
 	DependsOn   []string           `json:"dependsOn,omitempty"`
 	Timeout     *metav1.Duration   `json:"timeout,omitempty"`
+
+	FlightTasks []MissionStageFlightTaskTemplate `json:"flightTasks,omitempty"`
 }
 
 type MissionConfig struct {

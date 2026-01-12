@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -78,7 +79,11 @@ type FlightTaskSpec struct {
 
 	WeaponLoadout []FlightTaskWeaponLoadoutItem `json:"weaponLoadout,omitempty"`
 
-	PodTemplate *corev1.PodTemplateSpec `json:"podTemplate,omitempty"`
+	// PodTemplate is an optional pod template for executing the task.
+	// Using a schemaless object avoids generating an enormous OpenAPI schema in the CRD.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Type=object
+	PodTemplate *runtime.RawExtension `json:"podTemplate,omitempty"`
 }
 
 type SchedulingInfo struct {

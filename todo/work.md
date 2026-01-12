@@ -36,6 +36,12 @@
   - `GOPROXY=https://goproxy.cn,direct GOSUMDB=off make test`
   - 若仅做编译自检：`make build`
 
+#### 集群安装问题修复
+- ✅ 修复 `make install` 失败：FlightTask CRD 过大导致 `metadata.annotations` 超过 256Ki（kubectl client-side apply 的 last-applied 注解会膨胀）
+  - 将 `FlightTask.spec.podTemplate` 从 `corev1.PodTemplateSpec` 改为 `runtime.RawExtension`（schemaless，保留未知字段），显著缩小 CRD schema
+  - `make install` 改为 `kubectl apply --server-side`，避免写入 last-applied 注解
+- ✅ 已成功在集群安装 4 个 CRD：missions/missionstages/flighttasks/weapons
+
 #### 实施阶段
 当前阶段: **阶段一 - 基础平台搭建（1-2个月）**
 
@@ -87,3 +93,35 @@
 ---
 
 **最后更新**: 2026-01-10
+
+---
+
+### 2026-01-11
+
+#### Controller 开发推进
+- ✅ Mission Controller：补齐阶段推进逻辑
+  - 基于 `Mission.spec.stages[].dependsOn` 推进 `MissionStage.status.phase`：依赖满足则从 Pending → Running，并写入 `startTime`
+  - 汇总 `MissionStage.status.phase` 回写 `Mission.status.stagesSummary` 与 `Mission.status.phase`
+  - 统计 `FlightTask` 数量与各 phase，回写 `Mission.status.statistics`（按 label `mission=<mission.name>` 聚合）
+- ✅ MissionStage Controller：实现基础编排
+  - 根据 `MissionStage.spec.flightTasks` 创建/更新/清理 `FlightTask`（OwnerReference 指向 MissionStage）
+  - 任务推进：Stage Running 时将任务置为 `Scheduled`（sequential 只推进一个；parallel/mixed 推进全部）
+  - 汇总 `FlightTask.status.phase` 回写 `MissionStage.status.flightTasksStatus`、`message`，并在全部成功/有失败时置 `MissionStage` 为 Succeeded/Failed
+  - 支持 `MissionStage.spec.config.timeout` 超时失败
+
+#### 测试与环境说明
+- ⚠️ 本地 `go test` 需要网络/代理拉取 Go modules；另外默认 `GOCACHE=/root/.cache/go-build` 在当前环境会遇到权限问题
+- 建议你本地运行时设置：
+  - `GOCACHE=$PWD/.gocache`（避免写 /root/.cache）
+  - `GOPROXY` 指向可访问的代理（例如 `https://goproxy.cn,direct`）
+
+#### FlightTask 最小闭环（A）
+- ✅ FlightTask Controller：当 `FlightTask.status.phase=Scheduled` 时创建执行 Pod（默认 busybox，或使用 `spec.podTemplate`）
+- ✅ 监听 Pod 状态并回写 `FlightTask.status.phase`：Running/Succeeded/Failed，同时写入 `status.podRef`
+- ✅ envtest：补充 `flighttask_controller_test.go` 断言（Scheduled→创建 Pod→FlightTask 进入 Running）
+
+#### Mission → MissionStage → FlightTask → Pod 串联
+- ✅ 扩展 `Mission.spec.stages[].flightTasks`（对齐 `todo/plan/05-远海打击任务完整示例.md` 的完整任务定义）
+- ✅ Mission Controller 将 `stages[].flightTasks` 下发到 `MissionStage.spec.flightTasks`（自动补齐缺失的 task name）
+- ✅ 更新 `Mission` CRD schema：支持 `spec.stages[].flightTasks` 字段
+- ✅ 更新示例：`code/config/samples/airforce_v1alpha1_mission.yaml` 增加 `flightTasks`，用于一键触发整条链路

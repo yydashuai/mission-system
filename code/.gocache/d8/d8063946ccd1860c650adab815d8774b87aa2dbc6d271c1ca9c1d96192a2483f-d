@@ -1,0 +1,4 @@
+./flighttask_controller.go
+./mission_controller.go
+./missionstage_controller.go
+./weapon_controller.go
