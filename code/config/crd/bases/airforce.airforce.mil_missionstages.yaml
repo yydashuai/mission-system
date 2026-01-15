@@ -11,6 +11,8 @@ spec:
     kind: MissionStage
     listKind: MissionStageList
     plural: missionstages
+    shortNames:
+    - ms
     singular: missionstage
   scope: Namespaced
   versions:

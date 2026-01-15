@@ -115,6 +115,7 @@ type MissionStageStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:resource:shortName=ms
 //+kubebuilder:subresource:status
 
 // MissionStage is the Schema for the missionstages API

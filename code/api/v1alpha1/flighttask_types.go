@@ -115,6 +115,7 @@ type FlightTaskStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:resource:shortName=ft
 //+kubebuilder:subresource:status
 
 // FlightTask is the Schema for the flighttasks API

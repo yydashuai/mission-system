@@ -11,6 +11,8 @@ spec:
     kind: FlightTask
     listKind: FlightTaskList
     plural: flighttasks
+    shortNames:
+    - ft
     singular: flighttask
   scope: Namespaced
   versions:
