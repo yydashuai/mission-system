@@ -10,3 +10,12 @@ spec:
     - weaponRef:
         name: pl-15
       quantity: 2
+  podTemplate:
+    metadata:
+      labels:
+        test-case: image-pull-fail
+    spec:
+      containers:
+        - name: task
+          image: registry.invalid/nonexistent:never
+          command: ["sh", "-c", "echo flighttask-start && sleep 3600"]

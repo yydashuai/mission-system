@@ -48,15 +48,17 @@
 根据实施路线图 (todo/plan/06-系统总结与实施建议.md):
 - 阶段一任务清单:
   - [x] 搭建K8s集群（集群已经搭建完成）
-  - [ ] 开发CRD定义
-    - [ ] Mission CRD
-    - [ ] MissionStage CRD
-    - [ ] FlightTask CRD
-    - [ ] Weapon CRD
-  - [ ] 开发核心Controller
-    - [ ] Mission Controller
-    - [ ] MissionStage Controller
-    - [ ] FlightTask Controller
+  - [x] 开发CRD定义
+    - [x] Mission CRD
+    - [x] MissionStage CRD
+    - [x] FlightTask CRD
+    - [x] Weapon CRD
+  - [x] 开发核心Controller
+    - [x] Mission Controller
+    - [x] MissionStage Controller
+    - [x] FlightTask Controller
+    - [x] Weapon Controller（最小闭环）
+  - [x] FlightTask 基础调度约束（NodeSelector/NodeAffinity）
   - [ ] 验证基本功能
 
 ---
@@ -92,7 +94,7 @@
 
 ---
 
-**最后更新**: 2026-01-10
+**最后更新**: 2026-01-13
 
 ---
 
@@ -155,3 +157,30 @@
 #### FlightTask 自动推进（D）
 - ✅ 对“独立 FlightTask”（无 `spec.stageRef.name` 且不归属 `MissionStage`）自动从 `Pending -> Scheduled`，避免需要手动 patch status
 - ✅ 保持与 MissionStage 编排不冲突：只对独立任务生效，由 MissionStage 创建/管理的 FlightTask 仍由 MissionStage Controller 推进
+
+#### Weapon Controller 最小闭环（E）
+- ✅ Weapon Controller：初始化 `Weapon.status.phase=Available`（若为空）
+- ✅ Weapon Controller：初始化 `Weapon.status.usage`（若为空）
+- ✅ Weapon Controller：根据 `spec.compatibility.aircraftTypes` 回写 `status.compatibilityChecks`（best-effort，可观测）
+
+---
+
+### 2026-01-13
+
+#### FlightTask 调度约束与可观测性（F）
+- ✅ FlightTask Controller：根据 `spec.aircraftRequirement` 自动补齐 Pod 调度约束
+  - `aircraft.mil/type`、`aircraft.mil/status=ready`
+  - `aircraft.mil/fuel.level`、`aircraft.mil/hardpoint.available`、`aircraft.mil/capability.*` 的 NodeAffinity（required）
+  - `aircraft.mil/location.zone` 的 NodeAffinity（preferred）
+- ✅ FlightTask 状态推进语义修正：Pod 创建后保持 `Scheduled`，由 Pod 实际状态推进到 `Running/Succeeded/Failed`
+- ✅ MissionStage.status.flightTasksStatus：补齐 `podName` 与 `aircraftNode` 字段（基于 FlightTask.status）
+
+#### Pod/FlightTask 状态对齐增强（G）
+- ✅ FlightTask Controller：观测 `PodScheduled` 条件并回写到 `FlightTask.status.conditions`（便于直接看到 Unschedulable 原因）
+- ✅ FlightTask Controller：基于 `FailedScheduling` 事件累计 `status.schedulingInfo.schedulingAttempts`（并在 Pod Pending 且未分配 Node 时周期性 Requeue 以刷新）
+- ✅ FlightTask Controller：在 Pod 真正被分配 Node 时，使用 Pod 的 `PodScheduled.lastTransitionTime`（或 `pod.status.startTime`）回写 `status.schedulingInfo.assignedTime`
+- ✅ FailedScheduling 计数增强：同时按 `involvedObject.uid` 与 `involvedObject.name` 聚合（避免漏计），并合并到同一次 status patch（避免条件滞后）
+- ✅ 兼容两套 Event API：同时统计 `core/v1 Event` 与 `events.k8s.io/v1 Event` 的 FailedScheduling（避免不同组件写入不同资源导致漏计）
+- ✅ FailedScheduling 口径调整：按 Pod `name` 聚合并过滤在 `FlightTask.creationTimestamp` 之前的事件（支持 Pod 重建仍累计），并忽略 `skip schedule deleting pod` 噪声
+- ✅ FailedScheduling 窗口修正：统计窗口改为 `Pod.metadata.creationTimestamp`（避免 FlightTask 可能被重建导致漏算更早的事件），确保多条 Event 的 `count` 会累加进 `schedulingAttempts`
+- ✅ 状态一致性：PodScheduled condition 每次都会同步（不管内容是否变化），FailedScheduling 不再按时间窗口过滤，避免漏计

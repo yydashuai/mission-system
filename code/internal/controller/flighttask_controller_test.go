@@ -79,7 +79,11 @@ var _ = Describe("FlightTask Controller", func() {
 					Spec: airforcev1alpha1.FlightTaskSpec{
 						StageRef: airforcev1alpha1.MissionStageRef{Name: "s1"},
 						AircraftRequirement: airforcev1alpha1.AircraftRequirement{
-							Type: "j20",
+							Type:               "j20",
+							MinFuelLevel:       70,
+							RequiredHardpoints: 4,
+							Capabilities:       []string{"stealth", "bvr"},
+							PreferredLocation:  "east-sea",
 						},
 						Role: "air-superiority",
 						WeaponLoadout: []airforcev1alpha1.FlightTaskWeaponLoadoutItem{
@@ -129,6 +133,14 @@ var _ = Describe("FlightTask Controller", func() {
 			var pod corev1.Pod
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pod", Namespace: "default"}, &pod)).To(Succeed())
 			Expect(pod.Spec.Containers).NotTo(BeEmpty())
+			Expect(pod.Spec.NodeSelector).NotTo(BeNil())
+			Expect(pod.Spec.NodeSelector["aircraft.mil/type"]).To(Equal("j20"))
+			Expect(pod.Spec.NodeSelector["aircraft.mil/status"]).To(Equal("ready"))
+
+			Expect(pod.Spec.Affinity).NotTo(BeNil())
+			Expect(pod.Spec.Affinity.NodeAffinity).NotTo(BeNil())
+			Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
+			Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms).NotTo(BeEmpty())
 
 			foundSidecar := false
 			for i := range pod.Spec.Containers {
@@ -141,9 +153,10 @@ var _ = Describe("FlightTask Controller", func() {
 
 			var updated airforcev1alpha1.FlightTask
 			Expect(k8sClient.Get(ctx, typeNamespacedName, &updated)).To(Succeed())
-			Expect(updated.Status.Phase).To(Equal(airforcev1alpha1.FlightTaskPhaseRunning))
+			Expect(updated.Status.Phase).To(Equal(airforcev1alpha1.FlightTaskPhasePending))
 			Expect(updated.Status.PodRef).NotTo(BeNil())
 			Expect(updated.Status.PodRef.Name).To(Equal(pod.Name))
+			Expect(updated.Status.PodRef.UID).NotTo(BeEmpty())
 		})
 	})
 })

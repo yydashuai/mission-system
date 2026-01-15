@@ -308,15 +308,16 @@ func (r *MissionStageReconciler) progressTasks(ctx context.Context, stage *airfo
 			}
 
 			if task.Status.Phase == airforcev1alpha1.FlightTaskPhasePending || task.Status.Phase == "" {
+				if task.Status.PodRef != nil {
+					return nil
+				}
 				patch := client.MergeFrom(task.DeepCopy())
 				task.Status.Phase = airforcev1alpha1.FlightTaskPhaseScheduled
-				now := metav1.Now()
 				if task.Status.SchedulingInfo == nil {
 					task.Status.SchedulingInfo = &airforcev1alpha1.SchedulingInfo{}
 				}
 				if task.Status.SchedulingInfo.SchedulingAttempts == 0 {
 					task.Status.SchedulingInfo.SchedulingAttempts = 1
-					task.Status.SchedulingInfo.AssignedTime = &now
 				}
 				if err := r.Status().Patch(ctx, task, patch); err != nil {
 					return err
@@ -332,15 +333,16 @@ func (r *MissionStageReconciler) progressTasks(ctx context.Context, stage *airfo
 			if task.Status.Phase != airforcev1alpha1.FlightTaskPhasePending && task.Status.Phase != "" {
 				continue
 			}
+			if task.Status.PodRef != nil {
+				continue
+			}
 			patch := client.MergeFrom(task.DeepCopy())
 			task.Status.Phase = airforcev1alpha1.FlightTaskPhaseScheduled
-			now := metav1.Now()
 			if task.Status.SchedulingInfo == nil {
 				task.Status.SchedulingInfo = &airforcev1alpha1.SchedulingInfo{}
 			}
 			if task.Status.SchedulingInfo.SchedulingAttempts == 0 {
 				task.Status.SchedulingInfo.SchedulingAttempts = 1
-				task.Status.SchedulingInfo.AssignedTime = &now
 			}
 			if err := r.Status().Patch(ctx, task, patch); err != nil {
 				return err
@@ -383,9 +385,22 @@ func (r *MissionStageReconciler) updateStageStatus(ctx context.Context, stage *a
 			pending++
 		}
 
+		aircraftNode := ""
+		podName := ""
+		if ok {
+			if task.Status.SchedulingInfo != nil {
+				aircraftNode = task.Status.SchedulingInfo.AssignedNode
+			}
+			if task.Status.PodRef != nil {
+				podName = task.Status.PodRef.Name
+			}
+		}
+
 		statuses = append(statuses, airforcev1alpha1.MissionStageFlightTaskStatus{
-			Name:  tmpl.Name,
-			Phase: phase,
+			Name:         tmpl.Name,
+			Phase:        phase,
+			AircraftNode: aircraftNode,
+			PodName:      podName,
 		})
 	}
 

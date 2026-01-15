@@ -22,11 +22,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,12 +43,18 @@ import (
 type FlightTaskReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// APIReader is used for direct apiserver reads (e.g. listing Events with field selectors),
+	// because cached clients do not support arbitrary field selectors.
+	APIReader client.Reader
 }
 
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=flighttasks,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=flighttasks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=flighttasks/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch
+//+kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=get;list;watch
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=weapons,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -73,18 +82,26 @@ func (r *FlightTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if task.Status.Phase == airforcev1alpha1.FlightTaskPhasePending && isStandaloneFlightTask(&task) {
+	if task.Status.Phase == airforcev1alpha1.FlightTaskPhasePending && isStandaloneFlightTask(&task) && task.Status.PodRef == nil {
 		patch := client.MergeFrom(task.DeepCopy())
 		task.Status.Phase = airforcev1alpha1.FlightTaskPhaseScheduled
+		if task.Status.SchedulingInfo == nil {
+			task.Status.SchedulingInfo = &airforcev1alpha1.SchedulingInfo{}
+		}
+		if task.Status.SchedulingInfo.SchedulingAttempts == 0 {
+			task.Status.SchedulingInfo.SchedulingAttempts = 1
+		}
 		if err := r.Status().Patch(ctx, &task, patch); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	if task.Status.Phase == airforcev1alpha1.FlightTaskPhaseScheduled || task.Status.Phase == airforcev1alpha1.FlightTaskPhaseRunning {
-		podName := fmt.Sprintf("%s-pod", task.Name)
-
+	podName := fmt.Sprintf("%s-pod", task.Name)
+	ensurePod := task.Status.PodRef != nil ||
+		task.Status.Phase == airforcev1alpha1.FlightTaskPhaseScheduled ||
+		task.Status.Phase == airforcev1alpha1.FlightTaskPhaseRunning
+	if ensurePod {
 		var pod corev1.Pod
 		err := r.Get(ctx, client.ObjectKey{Namespace: task.Namespace, Name: podName}, &pod)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -114,22 +131,52 @@ func (r *FlightTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err := r.Create(ctx, desiredPod); err != nil {
 				return ctrl.Result{}, err
 			}
+			// Refetch to ensure UID is populated before writing PodRef.
+			if err := r.Get(ctx, client.ObjectKey{Namespace: desiredPod.Namespace, Name: desiredPod.Name}, desiredPod); err != nil {
+				if apierrors.IsNotFound(err) {
+					return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+				}
+				return ctrl.Result{}, err
+			}
+
+			podRef := podReference(desiredPod)
+			if podRef == nil || podRef.UID == "" {
+				return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+			}
 
 			patch := client.MergeFrom(task.DeepCopy())
-			task.Status.PodRef = &corev1.ObjectReference{
-				APIVersion: "v1",
-				Kind:       "Pod",
-				Namespace:  task.Namespace,
-				Name:       desiredPod.Name,
+			task.Status.PodRef = podRef
+			task.Status.Phase = airforcev1alpha1.FlightTaskPhasePending
+			if task.Status.SchedulingInfo == nil {
+				task.Status.SchedulingInfo = &airforcev1alpha1.SchedulingInfo{}
 			}
-			task.Status.Phase = airforcev1alpha1.FlightTaskPhaseRunning
+			task.Status.SchedulingInfo.SchedulingAttempts = 1
+			task.Status.SchedulingInfo.AssignedNode = ""
+			task.Status.SchedulingInfo.AssignedTime = nil
+			meta := metav1.Condition{
+				Type:               "PodCreated",
+				Status:             metav1.ConditionTrue,
+				Reason:             "Created",
+				Message:            "Pod created for FlightTask",
+				ObservedGeneration: task.Generation,
+			}
+			apimeta.SetStatusCondition(&task.Status.Conditions, meta)
 			if err := r.Status().Patch(ctx, &task, patch); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 
+		original := task.DeepCopy()
+
+		samePod := task.Status.PodRef != nil && task.Status.PodRef.UID != "" && string(task.Status.PodRef.UID) == string(pod.UID)
+		if !samePod {
+			task.Status.SchedulingInfo = &airforcev1alpha1.SchedulingInfo{SchedulingAttempts: 1}
+		}
+
 		desiredPhase := task.Status.Phase
+		podScheduled := pod.Spec.NodeName != "" || isPodScheduled(&pod)
+		pullReason, pullMessage, pullFailed := imagePullFailure(&pod)
 		switch pod.Status.Phase {
 		case corev1.PodRunning:
 			desiredPhase = airforcev1alpha1.FlightTaskPhaseRunning
@@ -138,31 +185,92 @@ func (r *FlightTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		case corev1.PodFailed:
 			desiredPhase = airforcev1alpha1.FlightTaskPhaseFailed
 		case corev1.PodPending:
-			if desiredPhase == "" || desiredPhase == airforcev1alpha1.FlightTaskPhasePending {
+			if podScheduled {
 				desiredPhase = airforcev1alpha1.FlightTaskPhaseScheduled
+			} else {
+				desiredPhase = airforcev1alpha1.FlightTaskPhasePending
 			}
 		default:
 			// keep
 		}
+		if pullFailed && desiredPhase != airforcev1alpha1.FlightTaskPhaseSucceeded && desiredPhase != airforcev1alpha1.FlightTaskPhaseFailed {
+			// 拉镜像失败时维持 Scheduled（或 Pending）以便人工处理/重试，而不是误判为运行中
+			desiredPhase = airforcev1alpha1.FlightTaskPhaseScheduled
+		}
+
+		summary, summaryErr := r.summarizeFailedScheduling(ctx, &task, &pod)
+		if summaryErr != nil {
+			logger.V(1).Info("failed to summarize FailedScheduling events", "error", summaryErr)
+		}
+		desiredAssignedNode := ""
+		var desiredAssignedTime *metav1.Time
+		if pod.Spec.NodeName != "" {
+			desiredAssignedNode = pod.Spec.NodeName
+			desiredAssignedTime = podScheduledTime(&pod)
+			if desiredAssignedTime == nil && pod.Status.StartTime != nil {
+				desiredAssignedTime = pod.Status.StartTime.DeepCopy()
+			}
+		}
+
+		podScheduledConditionChanged := syncPodScheduledCondition(&task, &pod)
+		failedSchedulingConditionChanged := syncFailedSchedulingCondition(&task, &pod, summary)
+		podCreatedConditionChanged := ensurePodCreatedCondition(&task, &pod)
+		imagePullConditionChanged := syncImagePullFailedCondition(&task, pullFailed, pullReason, pullMessage)
+
+		desiredAttempts := int32(1)
+		if samePod && task.Status.SchedulingInfo != nil && task.Status.SchedulingInfo.SchedulingAttempts > desiredAttempts {
+			desiredAttempts = task.Status.SchedulingInfo.SchedulingAttempts
+		}
+		if summary != nil && summary.Attempts > desiredAttempts {
+			desiredAttempts = summary.Attempts
+		}
 
 		needsPatch := task.Status.PodRef == nil ||
 			task.Status.PodRef.Name != pod.Name ||
-			task.Status.Phase != desiredPhase
+			task.Status.PodRef.UID == "" ||
+			(task.Status.PodRef.UID != "" && task.Status.PodRef.UID != pod.UID) ||
+			task.Status.Phase != desiredPhase ||
+			podScheduledConditionChanged ||
+			failedSchedulingConditionChanged ||
+			podCreatedConditionChanged ||
+			imagePullConditionChanged
+		if task.Status.SchedulingInfo == nil ||
+			task.Status.SchedulingInfo.SchedulingAttempts != desiredAttempts ||
+			task.Status.SchedulingInfo.AssignedNode != desiredAssignedNode ||
+			!timesEqual(task.Status.SchedulingInfo.AssignedTime, desiredAssignedTime) {
+			needsPatch = true
+		}
 		if needsPatch {
-			patch := client.MergeFrom(task.DeepCopy())
-			task.Status.Phase = desiredPhase
-			if task.Status.PodRef == nil {
-				task.Status.PodRef = &corev1.ObjectReference{
-					APIVersion: "v1",
-					Kind:       "Pod",
-					Namespace:  pod.Namespace,
-					Name:       pod.Name,
-				}
+			podRef := podReference(&pod)
+			if podRef == nil || podRef.UID == "" {
+				return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 			}
+
+			patch := client.MergeFrom(original)
+			task.Status.Phase = desiredPhase
+			task.Status.PodRef = podRef
+			if task.Status.SchedulingInfo == nil {
+				task.Status.SchedulingInfo = &airforcev1alpha1.SchedulingInfo{}
+			}
+			task.Status.SchedulingInfo.SchedulingAttempts = desiredAttempts
+			task.Status.SchedulingInfo.AssignedNode = desiredAssignedNode
+			task.Status.SchedulingInfo.AssignedTime = desiredAssignedTime
 			if err := r.Status().Patch(ctx, &task, patch); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
+
+		if pod.Status.Phase == corev1.PodPending && pod.Spec.NodeName == "" {
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+	}
+
+	if task.Status.PodRef != nil &&
+		task.Status.Phase != airforcev1alpha1.FlightTaskPhaseSucceeded &&
+		task.Status.Phase != airforcev1alpha1.FlightTaskPhaseFailed {
+		// Periodically resync while the task is still active to catch Pod status transitions
+		// even if a watch event is missed.
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -178,6 +286,37 @@ func isStandaloneFlightTask(task *airforcev1alpha1.FlightTask) bool {
 		}
 	}
 	return true
+}
+
+func podReference(pod *corev1.Pod) *corev1.ObjectReference {
+	if pod == nil {
+		return nil
+	}
+	return &corev1.ObjectReference{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Namespace:  pod.Namespace,
+		Name:       pod.Name,
+		UID:        pod.UID,
+	}
+}
+
+func ensurePodCreatedCondition(task *airforcev1alpha1.FlightTask, pod *corev1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	existing := apimeta.FindStatusCondition(task.Status.Conditions, "PodCreated")
+	if existing != nil {
+		return false
+	}
+	cond := metav1.Condition{
+		Type:               "PodCreated",
+		Status:             metav1.ConditionTrue,
+		Reason:             "Created",
+		Message:            "Pod created for FlightTask",
+		ObservedGeneration: task.Generation,
+	}
+	return setConditionWithTime(&task.Status.Conditions, cond, metav1.Now())
 }
 
 func (r *FlightTaskReconciler) buildPodForTask(ctx context.Context, task *airforcev1alpha1.FlightTask, podName string) (*corev1.Pod, error) {
@@ -246,11 +385,452 @@ func (r *FlightTaskReconciler) buildPodForTask(ctx context.Context, task *airfor
 		}
 	}
 
+	applyAircraftSchedulingConstraints(pod, task.Spec.AircraftRequirement)
+
 	if err := r.injectWeaponSidecars(ctx, pod, task); err != nil {
 		return nil, err
 	}
 
 	return pod, nil
+}
+
+func (r *FlightTaskReconciler) reader() client.Reader {
+	if r.APIReader != nil {
+		return r.APIReader
+	}
+	return r.Client
+}
+
+type failedSchedulingSummary struct {
+	Attempts      int32
+	LastReason    string
+	LastMessage   string
+	LastEventTime *metav1.Time
+}
+
+func (r *FlightTaskReconciler) summarizeFailedScheduling(ctx context.Context, task *airforcev1alpha1.FlightTask, pod *corev1.Pod) (*failedSchedulingSummary, error) {
+	summary := &failedSchedulingSummary{}
+	seen := map[string]int32{}
+	podUID := string(pod.UID)
+	if podUID == "" && task.Status.PodRef != nil {
+		podUID = string(task.Status.PodRef.UID)
+	}
+	if podUID == "" {
+		return summary, nil
+	}
+
+	record := func(uid string, count int32, reason, message string, ts metav1.Time, created metav1.Time) {
+		if isSkipDeletingPodMessage(message) {
+			return
+		}
+		if count <= 0 {
+			count = 1
+		}
+		if uid != "" {
+			if prev, ok := seen[uid]; ok {
+				if count > prev {
+					summary.Attempts += count - prev
+					seen[uid] = count
+				}
+			} else {
+				seen[uid] = count
+				summary.Attempts += count
+			}
+		} else {
+			summary.Attempts += count
+		}
+		if summary.LastEventTime == nil || ts.After(summary.LastEventTime.Time) {
+			summary.LastEventTime = &ts
+			summary.LastReason = reason
+			summary.LastMessage = message
+		}
+	}
+
+	var firstErr error
+
+	{
+		var list corev1.EventList
+		selector := fields.AndSelectors(fields.OneTermEqualSelector("involvedObject.name", pod.Name), fields.OneTermEqualSelector("reason", "FailedScheduling"))
+		if err := r.reader().List(ctx, &list, &client.ListOptions{
+			Namespace:     pod.Namespace,
+			FieldSelector: selector,
+		}); err != nil {
+			firstErr = err
+		} else {
+			for i := range list.Items {
+				ev := list.Items[i]
+				if string(ev.InvolvedObject.UID) != podUID {
+					continue
+				}
+				count := int32(ev.Count)
+				ts := eventTimeForCoreEvent(&ev)
+				record(string(ev.UID), count, ev.Reason, ev.Message, ts, ev.CreationTimestamp)
+			}
+		}
+	}
+
+	{
+		var list eventsv1.EventList
+		selector := fields.AndSelectors(fields.OneTermEqualSelector("regarding.name", pod.Name), fields.OneTermEqualSelector("reason", "FailedScheduling"))
+		if err := r.reader().List(ctx, &list, &client.ListOptions{
+			Namespace:     pod.Namespace,
+			FieldSelector: selector,
+		}); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+		} else {
+			for i := range list.Items {
+				ev := list.Items[i]
+				if string(ev.Regarding.UID) != podUID {
+					continue
+				}
+				count := int32(1) // default to a single occurrence
+				if ev.Series != nil && ev.Series.Count > 0 {
+					count = ev.Series.Count
+				} else if ev.DeprecatedCount > 0 {
+					count = ev.DeprecatedCount
+				}
+				ts := eventTimeForEventsV1(&ev)
+				record(string(ev.UID), count, ev.Reason, eventsV1Message(&ev), ts, ev.CreationTimestamp)
+			}
+		}
+	}
+
+	if summary.Attempts == 0 && firstErr != nil {
+		return summary, firstErr
+	}
+	return summary, nil
+}
+
+func eventsV1Message(e *eventsv1.Event) string {
+	if e == nil {
+		return ""
+	}
+	if e.Note != "" {
+		return e.Note
+	}
+	return ""
+}
+
+func withinWindow(eventTime, since metav1.Time) bool {
+	if since.IsZero() {
+		return true
+	}
+	if eventTime.IsZero() {
+		return true
+	}
+	return !eventTime.Time.Before(since.Time)
+}
+
+func isSkipDeletingPodMessage(msg string) bool {
+	msg = strings.TrimSpace(msg)
+	return strings.HasPrefix(msg, "skip schedule deleting pod:")
+}
+
+func eventTimeForCoreEvent(e *corev1.Event) metav1.Time {
+	if e == nil {
+		return metav1.Time{}
+	}
+	if !e.CreationTimestamp.IsZero() {
+		return e.CreationTimestamp
+	}
+	return metav1.Time{}
+}
+
+func eventTimeForEventsV1(e *eventsv1.Event) metav1.Time {
+	if e == nil {
+		return metav1.Time{}
+	}
+	if !e.CreationTimestamp.IsZero() {
+		return e.CreationTimestamp
+	}
+	return metav1.Time{}
+}
+
+func syncPodScheduledCondition(task *airforcev1alpha1.FlightTask, pod *corev1.Pod) bool {
+	podSched := findPodCondition(pod.Status.Conditions, corev1.PodScheduled)
+	if podSched == nil {
+		return false
+	}
+
+	cond := metav1.Condition{
+		Type:               "PodScheduled",
+		ObservedGeneration: task.Generation,
+		Reason:             podSched.Reason,
+		Message:            podSched.Message,
+	}
+	if cond.Reason == "" {
+		cond.Reason = "PodScheduled"
+	}
+	switch podSched.Status {
+	case corev1.ConditionTrue:
+		cond.Status = metav1.ConditionTrue
+	case corev1.ConditionFalse:
+		cond.Status = metav1.ConditionFalse
+	default:
+		cond.Status = metav1.ConditionUnknown
+	}
+	return setConditionWithTime(&task.Status.Conditions, cond, podSched.LastTransitionTime)
+}
+
+func syncFailedSchedulingCondition(task *airforcev1alpha1.FlightTask, pod *corev1.Pod, summary *failedSchedulingSummary) bool {
+	if summary == nil {
+		summary = &failedSchedulingSummary{}
+	}
+
+	// Fallback: if we couldn't pull events but PodScheduled is False, surface that as a FailedScheduling condition.
+	if summary.Attempts == 0 && pod != nil {
+		if podSched := findPodCondition(pod.Status.Conditions, corev1.PodScheduled); podSched != nil && podSched.Status == corev1.ConditionFalse {
+			summary.Attempts = 1
+			if summary.LastReason == "" {
+				summary.LastReason = podSched.Reason
+			}
+			if summary.LastMessage == "" {
+				summary.LastMessage = podSched.Message
+			}
+			summary.LastEventTime = &podSched.LastTransitionTime
+		}
+	}
+
+	cond := metav1.Condition{
+		Type:               "FailedScheduling",
+		ObservedGeneration: task.Generation,
+	}
+	if summary.Attempts > 0 {
+		cond.Status = metav1.ConditionTrue
+		cond.Reason = summary.LastReason
+		if cond.Reason == "" {
+			cond.Reason = "FailedScheduling"
+		}
+		cond.Message = summary.LastMessage
+		ts := metav1.Now()
+		if summary.LastEventTime != nil {
+			ts = *summary.LastEventTime
+		}
+		return setConditionWithTime(&task.Status.Conditions, cond, ts)
+	}
+
+	cond.Status = metav1.ConditionFalse
+	cond.Reason = "NoFailedSchedulingEvents"
+	cond.Message = "No FailedScheduling events observed"
+	return setConditionWithTime(&task.Status.Conditions, cond, metav1.Now())
+}
+
+func findPodCondition(conditions []corev1.PodCondition, t corev1.PodConditionType) *corev1.PodCondition {
+	for i := range conditions {
+		if conditions[i].Type == t {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
+func isPodScheduled(pod *corev1.Pod) bool {
+	c := findPodCondition(pod.Status.Conditions, corev1.PodScheduled)
+	return c != nil && c.Status == corev1.ConditionTrue
+}
+
+func imagePullFailure(pod *corev1.Pod) (string, string, bool) {
+	check := func(statuses []corev1.ContainerStatus) (string, string, bool) {
+		for i := range statuses {
+			cs := statuses[i]
+			if cs.State.Waiting == nil {
+				continue
+			}
+			reason := cs.State.Waiting.Reason
+			switch reason {
+			case "ErrImagePull", "ImagePullBackOff", "RegistryUnavailable", "InvalidImageName":
+				msg := cs.State.Waiting.Message
+				if msg == "" {
+					msg = "pod image pull failed"
+				}
+				if reason == "" {
+					reason = "ImagePullFailed"
+				}
+				return reason, msg, true
+			}
+		}
+		return "", "", false
+	}
+
+	if reason, msg, failed := check(pod.Status.ContainerStatuses); failed {
+		return reason, msg, true
+	}
+	if reason, msg, failed := check(pod.Status.InitContainerStatuses); failed {
+		return reason, msg, true
+	}
+	return "", "", false
+}
+
+func syncImagePullFailedCondition(task *airforcev1alpha1.FlightTask, failed bool, reason, message string) bool {
+	existing := apimeta.FindStatusCondition(task.Status.Conditions, "ImagePullFailed")
+	cond := metav1.Condition{
+		Type:               "ImagePullFailed",
+		ObservedGeneration: task.Generation,
+	}
+	var transitionTime metav1.Time
+	if existing != nil {
+		transitionTime = existing.LastTransitionTime
+	}
+	if failed {
+		cond.Status = metav1.ConditionTrue
+		cond.Reason = reason
+		if cond.Reason == "" {
+			cond.Reason = "ImagePullFailed"
+		}
+		if message != "" {
+			cond.Message = message
+		} else {
+			cond.Message = "pod image pull failed"
+		}
+		if existing == nil || existing.Status != cond.Status || existing.Reason != cond.Reason || existing.Message != cond.Message {
+			transitionTime = metav1.Now()
+		}
+		return setConditionWithTime(&task.Status.Conditions, cond, transitionTime)
+	}
+
+	cond.Status = metav1.ConditionFalse
+	cond.Reason = "NoImagePullError"
+	cond.Message = "no image pull errors observed"
+	if existing == nil || existing.Status != cond.Status || existing.Reason != cond.Reason || existing.Message != cond.Message {
+		transitionTime = metav1.Now()
+	}
+	return setConditionWithTime(&task.Status.Conditions, cond, transitionTime)
+}
+
+func podScheduledTime(pod *corev1.Pod) *metav1.Time {
+	c := findPodCondition(pod.Status.Conditions, corev1.PodScheduled)
+	if c == nil {
+		return nil
+	}
+	if c.LastTransitionTime.IsZero() {
+		return nil
+	}
+	return c.LastTransitionTime.DeepCopy()
+}
+
+func timesEqual(a, b *metav1.Time) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Time.Equal(b.Time)
+}
+
+func setConditionWithTime(conditions *[]metav1.Condition, cond metav1.Condition, transitionTime metav1.Time) bool {
+	cond.LastTransitionTime = transitionTime
+	for i := range *conditions {
+		existing := &(*conditions)[i]
+		if existing.Type != cond.Type {
+			continue
+		}
+		(*conditions)[i] = cond
+		return !(existing.Status == cond.Status &&
+			existing.Reason == cond.Reason &&
+			existing.Message == cond.Message &&
+			existing.ObservedGeneration == cond.ObservedGeneration &&
+			existing.LastTransitionTime.Time.Equal(cond.LastTransitionTime.Time))
+	}
+	*conditions = append(*conditions, cond)
+	return true
+}
+
+func applyAircraftSchedulingConstraints(pod *corev1.Pod, req airforcev1alpha1.AircraftRequirement) {
+	aircraftType := strings.TrimSpace(req.Type)
+	if aircraftType != "" {
+		if pod.Spec.NodeSelector == nil {
+			pod.Spec.NodeSelector = map[string]string{}
+		}
+		if pod.Spec.NodeSelector["aircraft.mil/type"] == "" && pod.Spec.NodeSelector["aircraft.type"] == "" {
+			pod.Spec.NodeSelector["aircraft.mil/type"] = aircraftType
+			if pod.Spec.NodeSelector["aircraft.mil/status"] == "" && pod.Spec.NodeSelector["aircraft.status"] == "" {
+				pod.Spec.NodeSelector["aircraft.mil/status"] = "ready"
+			}
+		}
+	}
+
+	var required []corev1.NodeSelectorRequirement
+	if req.MinFuelLevel > 0 {
+		minFuel := int(req.MinFuelLevel) - 1
+		if minFuel < 0 {
+			minFuel = 0
+		}
+		required = append(required, corev1.NodeSelectorRequirement{
+			Key:      "aircraft.mil/fuel.level",
+			Operator: corev1.NodeSelectorOpGt,
+			Values:   []string{strconv.Itoa(minFuel)},
+		})
+	}
+	if req.RequiredHardpoints > 0 {
+		minHardpoints := int(req.RequiredHardpoints) - 1
+		if minHardpoints < 0 {
+			minHardpoints = 0
+		}
+		required = append(required, corev1.NodeSelectorRequirement{
+			Key:      "aircraft.mil/hardpoint.available",
+			Operator: corev1.NodeSelectorOpGt,
+			Values:   []string{strconv.Itoa(minHardpoints)},
+		})
+	}
+	for _, capName := range req.Capabilities {
+		capName = strings.TrimSpace(capName)
+		if capName == "" {
+			continue
+		}
+		required = append(required, corev1.NodeSelectorRequirement{
+			Key:      "aircraft.mil/capability." + sanitizeLabelKeySuffix(capName),
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   []string{"true"},
+		})
+	}
+
+	preferredLocation := strings.TrimSpace(req.PreferredLocation)
+	var preferred []corev1.PreferredSchedulingTerm
+	if preferredLocation != "" {
+		preferred = append(preferred, corev1.PreferredSchedulingTerm{
+			Weight: 50,
+			Preference: corev1.NodeSelectorTerm{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "aircraft.mil/location.zone",
+						Operator: corev1.NodeSelectorOpIn,
+						Values:   []string{preferredLocation},
+					},
+				},
+			},
+		})
+	}
+
+	if len(required) == 0 && len(preferred) == 0 {
+		return
+	}
+
+	if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity != nil {
+		if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil ||
+			len(pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0 {
+			return
+		}
+	}
+
+	if pod.Spec.Affinity == nil {
+		pod.Spec.Affinity = &corev1.Affinity{}
+	}
+	if pod.Spec.Affinity.NodeAffinity == nil {
+		pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+	if len(required) != 0 && pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+				{MatchExpressions: required},
+			},
+		}
+	}
+	if len(preferred) != 0 && len(pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution) == 0 {
+		pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = preferred
+	}
 }
 
 func (r *FlightTaskReconciler) injectWeaponSidecars(ctx context.Context, pod *corev1.Pod, task *airforcev1alpha1.FlightTask) error {
@@ -382,6 +962,40 @@ func sanitizeDNSLabel(s string) string {
 	if len(out) > 63 {
 		out = out[:63]
 		out = strings.TrimRight(out, "-")
+		if out == "" {
+			out = "x"
+		}
+	}
+	return out
+}
+
+func sanitizeLabelKeySuffix(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return "x"
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	lastWasSep := false
+	for _, r := range s {
+		isAllowed := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.'
+		if isAllowed {
+			b.WriteRune(r)
+			lastWasSep = false
+			continue
+		}
+		if !lastWasSep {
+			b.WriteByte('-')
+			lastWasSep = true
+		}
+	}
+	out := strings.Trim(b.String(), "-_.")
+	if out == "" {
+		out = "x"
+	}
+	if len(out) > 63 {
+		out = out[:63]
+		out = strings.TrimRight(out, "-_.")
 		if out == "" {
 			out = "x"
 		}
