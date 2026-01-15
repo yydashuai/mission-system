@@ -184,3 +184,14 @@
 - ✅ FailedScheduling 口径调整：按 Pod `name` 聚合并过滤在 `FlightTask.creationTimestamp` 之前的事件（支持 Pod 重建仍累计），并忽略 `skip schedule deleting pod` 噪声
 - ✅ FailedScheduling 窗口修正：统计窗口改为 `Pod.metadata.creationTimestamp`（避免 FlightTask 可能被重建导致漏算更早的事件），确保多条 Event 的 `count` 会累加进 `schedulingAttempts`
 - ✅ 状态一致性：PodScheduled condition 每次都会同步（不管内容是否变化），FailedScheduling 不再按时间窗口过滤，避免漏计
+
+### 2026-01-15
+
+#### FlightTask 状态对齐与镜像拉取失败处理
+- ✅ FlightTask Controller：为已有关联 Pod 且未终态的任务增加周期性 Requeue（默认 5s），避免漏掉事件导致 FlightTask 停在 Pending/Scheduled
+- ✅ 创建 Pod 后的短暂 NotFound 改为重排队重查，提升容错
+- ✅ 新增 `ImagePullFailed` 条件：检测 ErrImagePull/ImagePullBackOff 等 Waiting 原因，记录 reason/message，但不再将 FlightTask 置为 Failed（保持 Scheduled/Pending 便于人工修复）
+- ✅ 示例 `example/flighttask-with-weapon.yaml` 增加 `podTemplate`，使用不存在的镜像触发 ImagePullBackOff，可用于验证上述逻辑
+
+#### CRD 易用性
+- ✅ 为 MissionStage/FlightTask 增加短名：`ms`、`ft`（kubebuilder 注解与 CRD bases 均已更新）

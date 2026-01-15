@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -187,8 +188,17 @@ func (r *MissionStageReconciler) reconcileFlightTasks(ctx context.Context, stage
 				desiredSpec.WeaponLoadout = append(desiredSpec.WeaponLoadout, airforcev1alpha1.FlightTaskWeaponLoadoutItem{
 					WeaponRef: airforcev1alpha1.WeaponRef{Name: weapon.Weapon},
 					Quantity:  weapon.Quantity,
+					MountPoints: func() []string {
+						if len(weapon.MountPoints) == 0 {
+							return nil
+						}
+						return append([]string{}, weapon.MountPoints...)
+					}(),
 				})
 			}
+		}
+		if tmpl.PodTemplate != nil {
+			desiredSpec.PodTemplate = tmpl.PodTemplate.DeepCopy()
 		}
 
 		if apierrors.IsNotFound(err) {
@@ -250,6 +260,10 @@ func (r *MissionStageReconciler) reconcileFlightTasks(ctx context.Context, stage
 		}
 		if len(desiredSpec.WeaponLoadout) != 0 && !weaponLoadoutEqual(task.Spec.WeaponLoadout, desiredSpec.WeaponLoadout) {
 			task.Spec.WeaponLoadout = desiredSpec.WeaponLoadout
+			changed = true
+		}
+		if !rawExtensionEqual(task.Spec.PodTemplate, desiredSpec.PodTemplate) {
+			task.Spec.PodTemplate = desiredSpec.PodTemplate
 			changed = true
 		}
 
@@ -479,4 +493,14 @@ func weaponLoadoutEqual(a, b []airforcev1alpha1.FlightTaskWeaponLoadoutItem) boo
 		}
 	}
 	return true
+}
+
+func rawExtensionEqual(a, b *runtime.RawExtension) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return bytes.Equal(a.Raw, b.Raw)
 }

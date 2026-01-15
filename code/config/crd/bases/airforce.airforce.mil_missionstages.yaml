@@ -70,6 +70,9 @@ spec:
                       type: string
                     name:
                       type: string
+                    podTemplate:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     priority:
                       type: string
                     role:
@@ -81,6 +84,10 @@ spec:
                     weaponLoadout:
                       items:
                         properties:
+                          mountPoints:
+                            items:
+                              type: string
+                            type: array
                           quantity:
                             format: int32
                             type: integer

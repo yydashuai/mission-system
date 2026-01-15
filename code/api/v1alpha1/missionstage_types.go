@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -47,17 +48,19 @@ const (
 )
 
 type WeaponLoadoutItem struct {
-	Weapon   string `json:"weapon,omitempty"`
-	Quantity int32  `json:"quantity,omitempty"`
+	Weapon      string   `json:"weapon,omitempty"`
+	Quantity    int32    `json:"quantity,omitempty"`
+	MountPoints []string `json:"mountPoints,omitempty"`
 }
 
 type MissionStageFlightTaskTemplate struct {
-	Name          string              `json:"name,omitempty"`
-	Aircraft      string              `json:"aircraft,omitempty"`
-	Role          string              `json:"role,omitempty"`
-	Priority      MissionPriority     `json:"priority,omitempty"`
-	WeaponLoadout []WeaponLoadoutItem `json:"weaponLoadout,omitempty"`
-	TaskParams    map[string]string   `json:"taskParams,omitempty"`
+	Name          string                `json:"name,omitempty"`
+	Aircraft      string                `json:"aircraft,omitempty"`
+	Role          string                `json:"role,omitempty"`
+	Priority      MissionPriority       `json:"priority,omitempty"`
+	WeaponLoadout []WeaponLoadoutItem   `json:"weaponLoadout,omitempty"`
+	TaskParams    map[string]string     `json:"taskParams,omitempty"`
+	PodTemplate   *runtime.RawExtension `json:"podTemplate,omitempty"`
 }
 
 type MissionStageSynchronization struct {
