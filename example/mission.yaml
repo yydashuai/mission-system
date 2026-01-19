@@ -24,7 +24,7 @@ spec:
             - weapon: pl-15
               quantity: 2
               mountPoints: ["hp1", "hp2"]
-            - weapon: pl-11
+            - weapon: pl-10
               quantity: 2
               mountPoints: ["hp5", "hp6"]
           podTemplate:
@@ -174,7 +174,7 @@ spec:
     failurePolicy:
       maxRetries: 3
       retryStrategy: exponential
-      stageFailureAction: abort
+      stageFailureAction: continue
     cancellationPolicy:
       gracePeriod: 300s
       cleanup: true

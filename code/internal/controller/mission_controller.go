@@ -211,6 +211,7 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// 3) Progress stage phases based on Mission.spec.stages dependency graph.
+	failureAction := stageFailureAction(&mission)
 	stagesByName := make(map[string]*airforcev1alpha1.MissionStage, len(existingMissionStages.Items))
 	for i := range existingMissionStages.Items {
 		stage := &existingMissionStages.Items[i]
@@ -245,7 +246,15 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 			depObjName := fmt.Sprintf("%s-%s", mission.Name, dep)
 			depStage, ok := stagesByName[depObjName]
-			if !ok || depStage.Status.Phase != airforcev1alpha1.MissionStagePhaseSucceeded {
+			if !ok {
+				depsMet = false
+				break
+			}
+			if depStage.Status.Phase != airforcev1alpha1.MissionStagePhaseSucceeded {
+				if failureAction == airforcev1alpha1.StageFailureActionContinue &&
+					depStage.Status.Phase == airforcev1alpha1.MissionStagePhaseFailed {
+					continue
+				}
 				depsMet = false
 				break
 			}
@@ -284,6 +293,7 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	summaries := make([]airforcev1alpha1.MissionStageSummary, 0, len(mission.Spec.Stages))
 	stagePhases := make([]airforcev1alpha1.MissionPhase, 0, len(mission.Spec.Stages))
+	var failedStages, runningStages, pendingStages, succeededStages int
 	for _, stage := range mission.Spec.Stages {
 		if stage.Name == "" {
 			continue
@@ -316,6 +326,16 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			CompletionTime: ms.Status.CompletionTime,
 		})
 		stagePhases = append(stagePhases, phase)
+		switch phase {
+		case airforcev1alpha1.MissionPhaseFailed:
+			failedStages++
+		case airforcev1alpha1.MissionPhaseRunning:
+			runningStages++
+		case airforcev1alpha1.MissionPhaseSucceeded:
+			succeededStages++
+		default:
+			pendingStages++
+		}
 	}
 	mission.Status.StagesSummary = summaries
 
@@ -323,30 +343,23 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if len(stagePhases) == 0 {
 		desiredMissionPhase = airforcev1alpha1.MissionPhasePending
 	} else {
-		allSucceeded := true
-		anyRunning := false
-		for _, p := range stagePhases {
-			if p == airforcev1alpha1.MissionPhaseFailed {
-				desiredMissionPhase = airforcev1alpha1.MissionPhaseFailed
-				allSucceeded = false
-				anyRunning = false
-				break
-			}
-			if p == airforcev1alpha1.MissionPhaseRunning {
-				anyRunning = true
-				allSucceeded = false
-			}
-			if p == airforcev1alpha1.MissionPhasePending {
-				allSucceeded = false
-			}
-		}
-		if desiredMissionPhase != airforcev1alpha1.MissionPhaseFailed {
-			if allSucceeded {
-				desiredMissionPhase = airforcev1alpha1.MissionPhaseSucceeded
-			} else if anyRunning {
+		if failureAction == airforcev1alpha1.StageFailureActionContinue {
+			if runningStages > 0 {
 				desiredMissionPhase = airforcev1alpha1.MissionPhaseRunning
-			} else {
+			} else if pendingStages > 0 {
 				desiredMissionPhase = airforcev1alpha1.MissionPhasePending
+			} else {
+				desiredMissionPhase = airforcev1alpha1.MissionPhaseSucceeded
+			}
+		} else {
+			if failedStages > 0 {
+				desiredMissionPhase = airforcev1alpha1.MissionPhaseFailed
+			} else if runningStages > 0 {
+				desiredMissionPhase = airforcev1alpha1.MissionPhaseRunning
+			} else if pendingStages > 0 {
+				desiredMissionPhase = airforcev1alpha1.MissionPhasePending
+			} else {
+				desiredMissionPhase = airforcev1alpha1.MissionPhaseSucceeded
 			}
 		}
 	}
@@ -443,6 +456,21 @@ func missionStageFlightTasksEqual(a, b []airforcev1alpha1.MissionStageFlightTask
 		}
 	}
 	return true
+}
+
+func stageFailureAction(mission *airforcev1alpha1.Mission) airforcev1alpha1.StageFailureAction {
+	if mission == nil || mission.Spec.Config == nil || mission.Spec.Config.FailurePolicy == nil {
+		return airforcev1alpha1.StageFailureActionAbort
+	}
+	action := mission.Spec.Config.FailurePolicy.StageFailureAction
+	switch action {
+	case airforcev1alpha1.StageFailureActionAbort,
+		airforcev1alpha1.StageFailureActionContinue,
+		airforcev1alpha1.StageFailureActionRetry:
+		return action
+	default:
+		return airforcev1alpha1.StageFailureActionAbort
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

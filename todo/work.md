@@ -206,3 +206,12 @@
 #### 验证基本功能
 - ✅ 执行 `kubectl get pod -w` 观察：stage1 全部完成后 stage2 串行推进，stage2 完成后 stage3 并行启动
 - ✅ 所有阶段 Pod 均创建并完成（Completed），链路推进正常
+
+---
+
+### 2026-01-19
+
+#### FlightTask 失败兜底与状态展示
+- ✅ FlightTask：Pod 创建失败（Invalid）时，写入 `PodCreated=False` 条件并将任务置为 Failed，避免卡在 Scheduled
+- ✅ CRD：为 Mission/MissionStage/FlightTask/Weapon 增加 `Phase` 列（`kubectl get` 可直接看到 status.phase）
+- ✅ Mission failurePolicy：新增 `stageFailureAction=continue` 分支，阶段失败后允许依赖阶段继续推进且任务不中断
