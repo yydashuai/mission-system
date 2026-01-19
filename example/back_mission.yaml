@@ -24,7 +24,7 @@ spec:
             - weapon: pl-15
               quantity: 2
               mountPoints: ["hp1", "hp2"]
-            - weapon: pl-11
+            - weapon: pl-10
               quantity: 2
               mountPoints: ["hp5", "hp6"]
           podTemplate:

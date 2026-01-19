@@ -120,6 +120,7 @@ type MissionStageStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:resource:shortName=ms
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase",description="Status phase"
 
 // MissionStage is the Schema for the missionstages API
 type MissionStage struct {

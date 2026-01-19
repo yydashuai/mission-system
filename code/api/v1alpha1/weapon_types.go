@@ -119,6 +119,7 @@ type WeaponStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase",description="Status phase"
 
 // Weapon is the Schema for the weapons API
 type Weapon struct {

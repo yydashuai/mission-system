@@ -167,6 +167,7 @@ type MissionStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase",description="Status phase"
 
 // Mission is the Schema for the missions API
 type Mission struct {

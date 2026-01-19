@@ -117,6 +117,7 @@ type FlightTaskStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:resource:shortName=ft
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase",description="Status phase"
 
 // FlightTask is the Schema for the flighttasks API
 type FlightTask struct {

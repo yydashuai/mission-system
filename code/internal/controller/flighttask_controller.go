@@ -129,6 +129,22 @@ func (r *FlightTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, desiredPod); err != nil {
+				if apierrors.IsInvalid(err) {
+					patch := client.MergeFrom(task.DeepCopy())
+					task.Status.Phase = airforcev1alpha1.FlightTaskPhaseFailed
+					meta := metav1.Condition{
+						Type:               "PodCreated",
+						Status:             metav1.ConditionFalse,
+						Reason:             "InvalidPod",
+						Message:            err.Error(),
+						ObservedGeneration: task.Generation,
+					}
+					apimeta.SetStatusCondition(&task.Status.Conditions, meta)
+					if patchErr := r.Status().Patch(ctx, &task, patch); patchErr != nil {
+						return ctrl.Result{}, patchErr
+					}
+					return ctrl.Result{}, nil
+				}
 				return ctrl.Result{}, err
 			}
 			// Refetch to ensure UID is populated before writing PodRef.

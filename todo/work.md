@@ -195,3 +195,14 @@
 
 #### CRD 易用性
 - ✅ 为 MissionStage/FlightTask 增加短名：`ms`、`ft`（kubebuilder 注解与 CRD bases 均已更新）
+
+### 2026-01-16
+
+#### 示例验证清单
+- ✅ 更新示例任务：`example/mission.yaml` 扩展为 3 个阶段、每阶段 3 个 FlightTask
+- ✅ 阶段类型调整为并行 → 串行 → 并行，并配置依赖关系（stage2 依赖 stage1，stage3 依赖 stage2）
+- ✅ 每个任务补齐 `podTemplate`，使用短时 `sleep 5` 便于快速验证链路推进
+
+#### 验证基本功能
+- ✅ 执行 `kubectl get pod -w` 观察：stage1 全部完成后 stage2 串行推进，stage2 完成后 stage3 并行启动
+- ✅ 所有阶段 Pod 均创建并完成（Completed），链路推进正常

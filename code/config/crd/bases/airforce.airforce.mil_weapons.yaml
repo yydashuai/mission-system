@@ -14,7 +14,12 @@ spec:
     singular: weapon
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Status phase
+      jsonPath: .status.phase
+      name: Phase
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Weapon is the Schema for the weapons API
