@@ -180,9 +180,7 @@
 - ✅ FlightTask Controller：基于 `FailedScheduling` 事件累计 `status.schedulingInfo.schedulingAttempts`（并在 Pod Pending 且未分配 Node 时周期性 Requeue 以刷新）
 - ✅ FlightTask Controller：在 Pod 真正被分配 Node 时，使用 Pod 的 `PodScheduled.lastTransitionTime`（或 `pod.status.startTime`）回写 `status.schedulingInfo.assignedTime`
 - ✅ FailedScheduling 计数增强：同时按 `involvedObject.uid` 与 `involvedObject.name` 聚合（避免漏计），并合并到同一次 status patch（避免条件滞后）
-- ✅ 兼容两套 Event API：同时统计 `core/v1 Event` 与 `events.k8s.io/v1 Event` 的 FailedScheduling（避免不同组件写入不同资源导致漏计）
-- ✅ FailedScheduling 口径调整：按 Pod `name` 聚合并过滤在 `FlightTask.creationTimestamp` 之前的事件（支持 Pod 重建仍累计），并忽略 `skip schedule deleting pod` 噪声
-- ✅ FailedScheduling 窗口修正：统计窗口改为 `Pod.metadata.creationTimestamp`（避免 FlightTask 可能被重建导致漏算更早的事件），确保多条 Event 的 `count` 会累加进 `schedulingAttempts`
+- ✅ 兼容两套 Event API：根据podUID同时统计 `core/v1 Event` 与 `events.k8s.io/v1 Event` 的 FailedScheduling（避免不同组件写入不同资源导致漏计）
 - ✅ 状态一致性：PodScheduled condition 每次都会同步（不管内容是否变化），FailedScheduling 不再按时间窗口过滤，避免漏计
 
 ### 2026-01-15
@@ -200,14 +198,6 @@
 
 #### 示例验证清单
 - ✅ 更新示例任务：`example/mission.yaml` 扩展为 3 个阶段、每阶段 3 个 FlightTask
-- ✅ 阶段类型调整为并行 → 串行 → 并行，并配置依赖关系（stage2 依赖 stage1，stage3 依赖 stage2）
-- ✅ 每个任务补齐 `podTemplate`，使用短时 `sleep 5` 便于快速验证链路推进
-
-#### 验证基本功能
-- ✅ 执行 `kubectl get pod -w` 观察：stage1 全部完成后 stage2 串行推进，stage2 完成后 stage3 并行启动
-- ✅ 所有阶段 Pod 均创建并完成（Completed），链路推进正常
-
----
 
 ### 2026-01-19
 
@@ -215,3 +205,22 @@
 - ✅ FlightTask：Pod 创建失败（Invalid）时，写入 `PodCreated=False` 条件并将任务置为 Failed，避免卡在 Scheduled
 - ✅ CRD：为 Mission/MissionStage/FlightTask/Weapon 增加 `Phase` 列（`kubectl get` 可直接看到 status.phase）
 - ✅ Mission failurePolicy：新增 `stageFailureAction=continue` 分支，阶段失败后允许依赖阶段继续推进且任务不中断
+
+---
+
+### 2026-01-23
+
+#### 前端初始搭建（主节点展示）
+- ✅ 创建前端目录：`/project/frontend_master`
+- ✅ 初始化 Vite + Vue3 项目
+- ✅ 完成基础视觉系统与页面骨架（Header/Sidebar/Main/Detail）
+- ✅ 建立 Dashboard 初版页面与静态占位数据
+- ✅ 引入 Vue Router + Pinia，拆分布局组件
+  - TopBar / SideBar / DetailPanel 组件化
+  - 路由结构与页面占位（Missions/Stages/FlightTasks/Weapons/Cluster/Settings）
+- ✅ 阶段类型调整为并行 → 串行 → 并行，并配置依赖关系（stage2 依赖 stage1，stage3 依赖 stage2）
+- ✅ 每个任务补齐 `podTemplate`，使用短时 `sleep 5` 便于快速验证链路推进
+
+#### 验证基本功能
+- ✅ 执行 `kubectl get pod -w` 观察：stage1 全部完成后 stage2 串行推进，stage2 完成后 stage3 并行启动
+- ✅ 所有阶段 Pod 均创建并完成（Completed），链路推进正常
