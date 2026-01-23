@@ -1,50 +1,42 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useFocusStore } from '../stores/focus'
+import { useDataStore } from '../stores/data'
 
-const nodes = [
-  {
-    name: 'master-0',
-    role: 'control-plane',
-    status: 'Ready',
-    cpu: 72,
-    memory: 64,
-    pods: '22 / 110',
-    zone: 'alpha',
-  },
-  {
-    name: 'worker-1',
-    role: 'worker',
-    status: 'Ready',
-    cpu: 54,
-    memory: 58,
-    pods: '31 / 110',
-    zone: 'alpha',
-  },
-  {
-    name: 'worker-2',
-    role: 'worker',
-    status: 'NotReady',
-    cpu: 0,
-    memory: 0,
-    pods: '0 / 110',
-    zone: 'beta',
-  },
-]
+const dataStore = useDataStore()
+const { nodes, events } = storeToRefs(dataStore)
+const isLoading = computed(() => dataStore.loading.nodes)
 
-const events = [
-  { time: '08:23', scope: 'scheduler', level: 'warn', message: 'FailedScheduling on ft-escort-2' },
-  { time: '08:20', scope: 'kubelet', level: 'err', message: 'ImagePullBackOff ft-alpha-9' },
-  { time: '08:18', scope: 'controller', level: 'ok', message: 'Weapon PL-15 available' },
-  { time: '08:12', scope: 'controller', level: 'ok', message: 'Stage Jammer running' },
-]
-
-const selected = ref(nodes[0])
+const selectedKey = ref('')
 const focusStore = useFocusStore()
 
-watch(selected, (value) => {
-  focusStore.setFocus('node', value)
+const selected = computed(() => (
+  nodes.value.find((item) => item.name === selectedKey.value) || null
+))
+
+watch(nodes, (list) => {
+  if (!list.length) return
+  const exists = list.some((item) => item.name === selectedKey.value)
+  if (!exists) {
+    selectedKey.value = list[0].name
+  }
 }, { immediate: true })
+
+watch(selected, (value) => {
+  if (value) {
+    focusStore.setFocus('node', value)
+  }
+}, { immediate: true })
+
+const readyCount = computed(() => nodes.value.filter((item) => item.status === 'Ready').length)
+const totalNodes = computed(() => nodes.value.length)
+const podsInUse = computed(() => {
+  return nodes.value.reduce((sum, item) => {
+    const used = Number(String(item.pods).split('/')[0])
+    return Number.isFinite(used) ? sum + used : sum
+  }, 0)
+})
 </script>
 
 <template>
@@ -63,13 +55,13 @@ watch(selected, (value) => {
     <section class="stat-grid">
       <div class="stat-card">
         <div class="stat-label">Nodes Ready</div>
-        <div class="stat-value">2 / 3</div>
-        <div class="stat-meta">1 node tainted</div>
+        <div class="stat-value">{{ readyCount }} / {{ totalNodes }}</div>
+        <div class="stat-meta">{{ totalNodes - readyCount }} node tainted</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Pods Running</div>
-        <div class="stat-value">38</div>
-        <div class="stat-meta">6 Pending</div>
+        <div class="stat-value">{{ podsInUse }}</div>
+        <div class="stat-meta">Across {{ totalNodes }} nodes</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">CoreDNS</div>
@@ -90,16 +82,17 @@ watch(selected, (value) => {
             <div class="panel-title">Nodes</div>
             <div class="panel-sub">Capacity and utilization snapshot.</div>
           </div>
-          <span class="badge">3 nodes</span>
+          <span v-if="isLoading" class="badge warn">Loading</span>
+          <span v-else class="badge">{{ nodes.length }} nodes</span>
         </div>
         <div class="node-grid">
           <button
             v-for="node in nodes"
             :key="node.name"
             class="node-card"
-            :class="{ 'is-active': selected.name === node.name }"
+            :class="{ 'is-active': selectedKey === node.name }"
             type="button"
-            @click="selected = node"
+            @click="selectedKey = node.name"
           >
             <div class="node-head">
               <div>
@@ -127,6 +120,7 @@ watch(selected, (value) => {
               <span>{{ node.pods }}</span>
             </div>
           </button>
+          <div v-if="!nodes.length && !isLoading" class="empty-state">No nodes available.</div>
         </div>
       </div>
 
@@ -144,6 +138,7 @@ watch(selected, (value) => {
             <span class="badge" :class="item.level">{{ item.scope }}</span>
             <span class="event-text">{{ item.message }}</span>
           </div>
+          <div v-if="!events.length" class="empty-state">No events available.</div>
         </div>
 
         <div class="panel">

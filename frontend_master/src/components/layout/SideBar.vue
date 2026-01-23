@@ -1,11 +1,49 @@
 <script setup>
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '../../stores/ui'
+import { useDataStore } from '../../stores/data'
 
 const route = useRoute()
 const uiStore = useUiStore()
+const dataStore = useDataStore()
+const { nodes, events } = storeToRefs(dataStore)
 
 const isActive = (path) => route.path === path
+
+const totalNodes = computed(() => nodes.value.length)
+const readyNodes = computed(() => nodes.value.filter((item) => item.status === 'Ready').length)
+const controlNode = computed(() => (
+  nodes.value.find((item) => item.role === 'control-plane' || item.role === 'master') || null
+))
+
+const nodesValue = computed(() => {
+  if (dataStore.loading.nodes) return 'Loading'
+  if (!totalNodes.value) return '--'
+  return `${readyNodes.value} / ${totalNodes.value}`
+})
+
+const nodesMeta = computed(() => {
+  if (dataStore.loading.nodes) return 'Control Plane: --'
+  if (!controlNode.value) return 'Control Plane: --'
+  return `Control Plane: ${controlNode.value.status}`
+})
+
+const eventCount = computed(() => events.value.length)
+const warnCount = computed(() => events.value.filter((item) => item.level === 'warn' || item.level === 'err').length)
+
+const eventsValue = computed(() => {
+  if (dataStore.loading.events) return 'Loading'
+  if (!eventCount.value) return '--'
+  return String(eventCount.value)
+})
+
+const eventsMeta = computed(() => {
+  if (dataStore.loading.events) return 'Loading'
+  if (!eventCount.value) return 'No events'
+  return warnCount.value ? `${warnCount.value} warnings` : 'No warnings'
+})
 </script>
 
 <template>
@@ -28,13 +66,13 @@ const isActive = (path) => route.path === path
     <div class="health-grid">
       <div class="health-card">
         <div class="health-title">Nodes Ready</div>
-        <div class="health-value">2 / 3</div>
-        <div class="health-meta">Master: Ready</div>
+        <div class="health-value">{{ nodesValue }}</div>
+        <div class="health-meta">{{ nodesMeta }}</div>
       </div>
       <div class="health-card">
         <div class="health-title">Events (24h)</div>
-        <div class="health-value">17</div>
-        <div class="health-meta">3 warnings</div>
+        <div class="health-value">{{ eventsValue }}</div>
+        <div class="health-meta">{{ eventsMeta }}</div>
       </div>
     </div>
   </aside>

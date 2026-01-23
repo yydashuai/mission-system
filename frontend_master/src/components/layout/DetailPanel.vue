@@ -32,15 +32,16 @@ const phaseTone = (value) => {
 }
 
 const priorityTone = (value) => {
-  if (value === 'High') return 'warn'
-  if (value === 'Low') return 'muted'
+  const key = String(value || '').toLowerCase()
+  if (key === 'high' || key === 'critical') return 'warn'
+  if (key === 'low') return 'muted'
   return 'ok'
 }
 
 const weaponTone = (value) => {
   if (value === 'Available') return 'ok'
-  if (value === 'Degraded') return 'warn'
-  if (value === 'Retired') return 'muted'
+  if (value === 'Updating' || value === 'Degraded') return 'warn'
+  if (value === 'Deprecated' || value === 'Retired') return 'muted'
   return 'muted'
 }
 

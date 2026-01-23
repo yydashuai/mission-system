@@ -115,12 +115,10 @@ a {
 }
 
 .brand-mark {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 20px;
-  background: var(--accent);
-  color: #0a0f12;
-  padding: 8px 10px;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  background: rgba(10, 20, 26, 0.6);
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(255, 157, 61, 0.25);
 }
@@ -438,6 +436,17 @@ a {
 .data-table {
   display: grid;
   gap: var(--space-3);
+}
+
+.empty-state {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--stroke);
+  background: rgba(9, 16, 21, 0.35);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  width: 100%;
 }
 
 .data-row {

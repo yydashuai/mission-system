@@ -1,5 +1,10 @@
 const DEFAULT_CONFIG = {
   API_BASE: '',
+  API_MODE: 'k8s',
+  NAMESPACE: 'default',
+  AUTH_HEADER: 'Authorization',
+  AUTH_SCHEME: 'Bearer',
+  AUTH_TOKEN: '',
   REFRESH_INTERVAL: 10000,
   DETAIL_POLL_INTERVAL: 5000,
   READ_ONLY: true,
@@ -27,6 +32,11 @@ export const loadAppConfig = () => {
 
   return {
     apiBase: merged.API_BASE || '',
+    apiMode: merged.API_MODE || DEFAULT_CONFIG.API_MODE,
+    namespace: merged.NAMESPACE || DEFAULT_CONFIG.NAMESPACE,
+    authHeader: merged.AUTH_HEADER || DEFAULT_CONFIG.AUTH_HEADER,
+    authScheme: merged.AUTH_SCHEME || DEFAULT_CONFIG.AUTH_SCHEME,
+    authToken: merged.AUTH_TOKEN || DEFAULT_CONFIG.AUTH_TOKEN,
     refreshInterval: toNumber(merged.REFRESH_INTERVAL, DEFAULT_CONFIG.REFRESH_INTERVAL),
     detailPollInterval: toNumber(merged.DETAIL_POLL_INTERVAL, DEFAULT_CONFIG.DETAIL_POLL_INTERVAL),
     readOnly: toBoolean(merged.READ_ONLY, DEFAULT_CONFIG.READ_ONLY),

@@ -1,61 +1,51 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useFocusStore } from '../stores/focus'
+import { useDataStore } from '../stores/data'
 
-const weapons = [
-  {
-    name: 'PL-15',
-    status: 'Available',
-    image: 'registry.airforce/weapon/pl-15:1.4.2',
-    version: '1.4.2',
-    usage: '18 active',
-    aircraft: ['J-20', 'J-16'],
-    hardpoints: ['hp-2', 'hp-4'],
-    resources: 'cpu 200m / mem 128Mi',
-  },
-  {
-    name: 'PL-10',
-    status: 'Available',
-    image: 'registry.airforce/weapon/pl-10:2.1.0',
-    version: '2.1.0',
-    usage: '9 active',
-    aircraft: ['J-10', 'J-11', 'J-16'],
-    hardpoints: ['hp-1', 'hp-2'],
-    resources: 'cpu 150m / mem 96Mi',
-  },
-  {
-    name: 'YJ-12',
-    status: 'Degraded',
-    image: 'registry.airforce/weapon/yj-12:0.9.8',
-    version: '0.9.8',
-    usage: '2 active',
-    aircraft: ['H-6K'],
-    hardpoints: ['hp-6'],
-    resources: 'cpu 300m / mem 256Mi',
-  },
-  {
-    name: 'PL-5E',
-    status: 'Retired',
-    image: 'registry.airforce/weapon/pl-5e:legacy',
-    version: 'legacy',
-    usage: '0 active',
-    aircraft: ['J-7'],
-    hardpoints: ['hp-1'],
-    resources: 'cpu 80m / mem 64Mi',
-  },
-]
+const dataStore = useDataStore()
+const { weapons } = storeToRefs(dataStore)
+const isLoading = computed(() => dataStore.loading.weapons)
 
-const selected = ref(weapons[0])
+const selectedKey = ref('')
 const focusStore = useFocusStore()
 
+const emptyWeapon = {
+  name: '--',
+  status: '--',
+  image: '--',
+  version: '--',
+  usage: '--',
+  aircraft: [],
+  hardpoints: [],
+  resources: '--',
+}
+
+const selected = computed(() => (
+  weapons.value.find((item) => item.name === selectedKey.value) || null
+))
+
+const selectedSafe = computed(() => selected.value || emptyWeapon)
+
+watch(weapons, (list) => {
+  if (!list.length) return
+  const exists = list.some((item) => item.name === selectedKey.value)
+  if (!exists) {
+    selectedKey.value = list[0].name
+  }
+}, { immediate: true })
+
 watch(selected, (value) => {
-  focusStore.setFocus('weapon', value)
+  if (value) {
+    focusStore.setFocus('weapon', value)
+  }
 }, { immediate: true })
 
 const statusTone = (status) => {
   if (status === 'Available') return 'ok'
-  if (status === 'Degraded') return 'warn'
-  if (status === 'Retired') return 'muted'
+  if (status === 'Updating' || status === 'Degraded') return 'warn'
+  if (status === 'Deprecated' || status === 'Retired') return 'muted'
   return 'muted'
 }
 </script>
@@ -80,7 +70,8 @@ const statusTone = (status) => {
             <div class="panel-title">Weapon Registry</div>
             <div class="panel-sub">Sidecar packages available to FlightTasks.</div>
           </div>
-          <span class="badge">{{ weapons.length }} packages</span>
+          <span v-if="isLoading" class="badge warn">Loading</span>
+          <span v-else class="badge">{{ weapons.length }} packages</span>
         </div>
         <div class="data-table">
           <div class="data-row is-head" style="--cols: 1.1fr 0.8fr 0.9fr 0.7fr 0.7fr">
@@ -94,10 +85,10 @@ const statusTone = (status) => {
             v-for="weapon in weapons"
             :key="weapon.name"
             class="data-row is-selectable"
-            :class="{ active: selected.name === weapon.name }"
+            :class="{ active: selectedKey === weapon.name }"
             style="--cols: 1.1fr 0.8fr 0.9fr 0.7fr 0.7fr"
             type="button"
-            @click="selected = weapon"
+            @click="selectedKey = weapon.name"
           >
             <div class="cell-main">
               <div class="cell-title">{{ weapon.name }}</div>
@@ -108,6 +99,7 @@ const statusTone = (status) => {
             <span class="muted">{{ weapon.version }}</span>
             <span class="badge muted">{{ weapon.usage }}</span>
           </button>
+          <div v-if="!weapons.length && !isLoading" class="empty-state">No weapons available.</div>
         </div>
       </div>
 
@@ -115,25 +107,25 @@ const statusTone = (status) => {
         <div class="panel-header">
           <div>
             <div class="panel-title">Weapon Detail</div>
-            <div class="panel-sub">{{ selected.image }}</div>
+            <div class="panel-sub">{{ selectedSafe.image }}</div>
           </div>
-          <span class="badge" :class="statusTone(selected.status)">{{ selected.status }}</span>
+          <span class="badge" :class="statusTone(selectedSafe.status)">{{ selectedSafe.status }}</span>
         </div>
 
         <div class="detail-card">
-          <div class="detail-title">{{ selected.name }}</div>
+          <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
-            <span class="badge muted">Version {{ selected.version }}</span>
-            <span class="badge">{{ selected.usage }}</span>
+            <span class="badge muted">Version {{ selectedSafe.version }}</span>
+            <span class="badge">{{ selectedSafe.usage }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
               <span>Resources</span>
-              <span>{{ selected.resources }}</span>
+              <span>{{ selectedSafe.resources }}</span>
             </div>
             <div class="kv">
               <span>Image</span>
-              <span>{{ selected.image }}</span>
+              <span>{{ selectedSafe.image }}</span>
             </div>
           </div>
         </div>
@@ -146,10 +138,12 @@ const statusTone = (status) => {
             </div>
           </div>
           <div class="chip-row">
-            <span v-for="item in selected.aircraft" :key="item" class="chip">{{ item }}</span>
+            <span v-for="item in selectedSafe.aircraft" :key="item" class="chip">{{ item }}</span>
+            <div v-if="!selectedSafe.aircraft.length" class="empty-state">No aircraft listed.</div>
           </div>
           <div class="chip-row">
-            <span v-for="item in selected.hardpoints" :key="item" class="chip">{{ item }}</span>
+            <span v-for="item in selectedSafe.hardpoints" :key="item" class="chip">{{ item }}</span>
+            <div v-if="!selectedSafe.hardpoints.length" class="empty-state">No hardpoints listed.</div>
           </div>
         </div>
       </div>

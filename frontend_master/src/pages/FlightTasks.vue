@@ -1,85 +1,50 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useFocusStore } from '../stores/focus'
+import { useDataStore } from '../stores/data'
 
-const flightTasks = [
-  {
-    name: 'ft-alpha-9',
-    stage: 'Jammer',
-    mission: 'SeaStrike-02',
-    status: 'Scheduled',
-    pod: 'ft-alpha-9-pod',
-    node: 'worker-1',
-    weapon: 'PL-15',
-    attempts: 2,
-    scheduledAt: '08:14',
-    conditions: [
-      { label: 'PodScheduled', tone: 'ok', detail: 'Assigned to worker-1' },
-      { label: 'ImagePullBackOff', tone: 'err', detail: 'task container pull failed' },
-    ],
-    constraints: ['type:J-20', 'hardpoint:2+', 'fuel>70%', 'zone:alpha'],
-    podStatus: 'Pending',
-    sidecars: ['weapon-pl-15'],
-  },
-  {
-    name: 'ft-jammer-1',
-    stage: 'Jammer',
-    mission: 'SeaStrike-02',
-    status: 'Running',
-    pod: 'ft-jammer-1-pod',
-    node: 'worker-2',
-    weapon: 'PL-10',
-    attempts: 1,
-    scheduledAt: '08:03',
-    conditions: [
-      { label: 'PodScheduled', tone: 'ok', detail: 'Assigned to worker-2' },
-      { label: 'ContainersReady', tone: 'ok', detail: '2/2 running' },
-    ],
-    constraints: ['type:J-16', 'jammer', 'zone:alpha'],
-    podStatus: 'Running',
-    sidecars: ['weapon-pl-10'],
-  },
-  {
-    name: 'ft-strike-2',
-    stage: 'Strike',
-    mission: 'SeaStrike-02',
-    status: 'Pending',
-    pod: '--',
-    node: '--',
-    weapon: 'PL-15',
-    attempts: 0,
-    scheduledAt: '--',
-    conditions: [
-      { label: 'PodScheduled', tone: 'warn', detail: 'Awaiting stage readiness' },
-    ],
-    constraints: ['type:J-20', 'hardpoint:4+', 'fuel>85%'],
-    podStatus: 'Pending',
-    sidecars: ['weapon-pl-15'],
-  },
-  {
-    name: 'ft-escort-2',
-    stage: 'Escort',
-    mission: 'PolarShield-01',
-    status: 'Scheduled',
-    pod: 'ft-escort-2-pod',
-    node: 'pending',
-    weapon: 'PL-10',
-    attempts: 3,
-    scheduledAt: '08:19',
-    conditions: [
-      { label: 'FailedScheduling', tone: 'warn', detail: '0/2 nodes match affinity' },
-    ],
-    constraints: ['type:J-11', 'fuel>60%', 'zone:north'],
-    podStatus: 'Pending',
-    sidecars: ['weapon-pl-10'],
-  },
-]
+const dataStore = useDataStore()
+const { flightTasks } = storeToRefs(dataStore)
+const isLoading = computed(() => dataStore.loading.flightTasks)
 
-const selected = ref(flightTasks[0])
+const selectedKey = ref('')
 const focusStore = useFocusStore()
 
+const emptyTask = {
+  name: '--',
+  stage: '--',
+  mission: '--',
+  status: '--',
+  pod: '--',
+  node: '--',
+  weapon: '--',
+  attempts: '--',
+  scheduledAt: '--',
+  conditions: [],
+  constraints: [],
+  podStatus: '--',
+  sidecars: [],
+}
+
+const selected = computed(() => (
+  flightTasks.value.find((item) => item.name === selectedKey.value) || null
+))
+
+const selectedSafe = computed(() => selected.value || emptyTask)
+
+watch(flightTasks, (list) => {
+  if (!list.length) return
+  const exists = list.some((item) => item.name === selectedKey.value)
+  if (!exists) {
+    selectedKey.value = list[0].name
+  }
+}, { immediate: true })
+
 watch(selected, (value) => {
-  focusStore.setFocus('flighttask', value)
+  if (value) {
+    focusStore.setFocus('flighttask', value)
+  }
 }, { immediate: true })
 </script>
 
@@ -103,7 +68,8 @@ watch(selected, (value) => {
             <div class="panel-title">Task Queue</div>
             <div class="panel-sub">Select a task for scheduling context.</div>
           </div>
-          <span class="badge">{{ flightTasks.length }} tasks</span>
+          <span v-if="isLoading" class="badge warn">Loading</span>
+          <span v-else class="badge">{{ flightTasks.length }} tasks</span>
         </div>
         <div class="data-table">
           <div class="data-row is-head" style="--cols: 1.2fr 0.8fr 0.7fr 0.7fr 0.6fr">
@@ -117,10 +83,10 @@ watch(selected, (value) => {
             v-for="task in flightTasks"
             :key="task.name"
             class="data-row is-selectable"
-            :class="{ active: selected.name === task.name }"
+            :class="{ active: selectedKey === task.name }"
             style="--cols: 1.2fr 0.8fr 0.7fr 0.7fr 0.6fr"
             type="button"
-            @click="selected = task"
+            @click="selectedKey = task.name"
           >
             <div class="cell-main">
               <div class="cell-title">{{ task.name }}</div>
@@ -131,6 +97,7 @@ watch(selected, (value) => {
             <span class="muted">{{ task.node }}</span>
             <span class="badge muted">{{ task.weapon }}</span>
           </button>
+          <div v-if="!flightTasks.length && !isLoading" class="empty-state">No tasks available.</div>
         </div>
       </div>
 
@@ -138,33 +105,33 @@ watch(selected, (value) => {
         <div class="panel-header">
           <div>
             <div class="panel-title">Task Detail</div>
-            <div class="panel-sub">{{ selected.mission }} / {{ selected.stage }}</div>
+            <div class="panel-sub">{{ selectedSafe.mission }} / {{ selectedSafe.stage }}</div>
           </div>
-          <span class="badge" :class="selected.status.toLowerCase()">{{ selected.status }}</span>
+          <span class="badge" :class="String(selectedSafe.status).toLowerCase()">{{ selectedSafe.status }}</span>
         </div>
 
         <div class="detail-card">
-          <div class="detail-title">{{ selected.name }}</div>
+          <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
-            <span class="badge muted">Pod {{ selected.pod }}</span>
-            <span class="badge">Node {{ selected.node }}</span>
+            <span class="badge muted">Pod {{ selectedSafe.pod }}</span>
+            <span class="badge">Node {{ selectedSafe.node }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
               <span>Scheduled At</span>
-              <span>{{ selected.scheduledAt }}</span>
+              <span>{{ selectedSafe.scheduledAt }}</span>
             </div>
             <div class="kv">
               <span>Scheduling Attempts</span>
-              <span>{{ selected.attempts }}</span>
+              <span>{{ selectedSafe.attempts }}</span>
             </div>
             <div class="kv">
               <span>Pod Status</span>
-              <span>{{ selected.podStatus }}</span>
+              <span>{{ selectedSafe.podStatus }}</span>
             </div>
             <div class="kv">
               <span>Sidecars</span>
-              <span>{{ selected.sidecars.join(', ') }}</span>
+              <span>{{ selectedSafe.sidecars.join(', ') }}</span>
             </div>
           </div>
         </div>
@@ -177,7 +144,8 @@ watch(selected, (value) => {
             </div>
           </div>
           <div class="chip-row">
-            <span v-for="item in selected.constraints" :key="item" class="chip">{{ item }}</span>
+            <span v-for="item in selectedSafe.constraints" :key="item" class="chip">{{ item }}</span>
+            <div v-if="!selectedSafe.constraints.length" class="empty-state">No constraints data.</div>
           </div>
         </div>
 
@@ -189,10 +157,11 @@ watch(selected, (value) => {
             </div>
           </div>
           <div class="condition-list">
-            <div v-for="item in selected.conditions" :key="item.label" class="condition-item">
+            <div v-for="item in selectedSafe.conditions" :key="item.label" class="condition-item">
               <span class="badge" :class="item.tone">{{ item.label }}</span>
               <span class="condition-detail">{{ item.detail }}</span>
             </div>
+            <div v-if="!selectedSafe.conditions.length" class="empty-state">No condition updates.</div>
           </div>
         </div>
       </div>

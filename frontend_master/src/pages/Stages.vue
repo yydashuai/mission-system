@@ -1,68 +1,47 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useFocusStore } from '../stores/focus'
+import { useDataStore } from '../stores/data'
 
-const stages = [
-  {
-    name: 'Recon',
-    mission: 'SeaStrike-02',
-    index: 1,
-    mode: 'Parallel',
-    status: 'Succeeded',
-    timeout: '30m',
-    dependsOn: [],
-    tasks: [
-      { name: 'ft-recon-1', status: 'Succeeded', eta: 'done', node: 'worker-1' },
-      { name: 'ft-recon-2', status: 'Succeeded', eta: 'done', node: 'worker-2' },
-    ],
-  },
-  {
-    name: 'Jammer',
-    mission: 'SeaStrike-02',
-    index: 2,
-    mode: 'Sequential',
-    status: 'Running',
-    timeout: '25m',
-    dependsOn: ['Recon'],
-    tasks: [
-      { name: 'ft-jammer-1', status: 'Running', eta: '12m', node: 'worker-1' },
-      { name: 'ft-jammer-2', status: 'Scheduled', eta: '7m', node: 'pending' },
-    ],
-  },
-  {
-    name: 'Strike',
-    mission: 'SeaStrike-02',
-    index: 3,
-    mode: 'Parallel',
-    status: 'Pending',
-    timeout: '40m',
-    dependsOn: ['Jammer'],
-    tasks: [
-      { name: 'ft-strike-1', status: 'Pending', eta: '--', node: '--' },
-      { name: 'ft-strike-2', status: 'Pending', eta: '--', node: '--' },
-      { name: 'ft-strike-3', status: 'Pending', eta: '--', node: '--' },
-    ],
-  },
-  {
-    name: 'Escort',
-    mission: 'PolarShield-01',
-    index: 2,
-    mode: 'Parallel',
-    status: 'Scheduled',
-    timeout: '20m',
-    dependsOn: ['Scramble'],
-    tasks: [
-      { name: 'ft-escort-1', status: 'Scheduled', eta: '4m', node: 'pending' },
-      { name: 'ft-escort-2', status: 'Scheduled', eta: '4m', node: 'pending' },
-    ],
-  },
-]
+const dataStore = useDataStore()
+const { stages } = storeToRefs(dataStore)
+const isLoading = computed(() => dataStore.loading.stages)
 
-const selected = ref(stages[1])
+const selectedKey = ref('')
 const focusStore = useFocusStore()
 
+const emptyStage = {
+  name: '--',
+  mission: '--',
+  index: '--',
+  mode: '--',
+  status: '--',
+  timeout: '--',
+  dependsOn: [],
+  tasks: [],
+}
+
+const buildKey = (item) => `${item.mission}::${item.name}`
+
+const selected = computed(() => (
+  stages.value.find((item) => buildKey(item) === selectedKey.value) || null
+))
+
+const selectedSafe = computed(() => selected.value || emptyStage)
+
+watch(stages, (list) => {
+  if (!list.length) return
+  const exists = list.some((item) => buildKey(item) === selectedKey.value)
+  if (!exists) {
+    selectedKey.value = buildKey(list[0])
+  }
+}, { immediate: true })
+
 watch(selected, (value) => {
-  focusStore.setFocus('stage', value)
+  if (value) {
+    focusStore.setFocus('stage', value)
+  }
 }, { immediate: true })
 </script>
 
@@ -86,7 +65,8 @@ watch(selected, (value) => {
             <div class="panel-title">Stages</div>
             <div class="panel-sub">Sorted by mission and sequence.</div>
           </div>
-          <span class="badge">{{ stages.length }} stages</span>
+          <span v-if="isLoading" class="badge warn">Loading</span>
+          <span v-else class="badge">{{ stages.length }} stages</span>
         </div>
         <div class="data-table">
           <div class="data-row is-head" style="--cols: 1.2fr 0.9fr 0.7fr 0.7fr 0.6fr">
@@ -100,10 +80,10 @@ watch(selected, (value) => {
             v-for="stage in stages"
             :key="stage.name + stage.mission"
             class="data-row is-selectable"
-            :class="{ active: selected.name === stage.name && selected.mission === stage.mission }"
+            :class="{ active: selectedKey === buildKey(stage) }"
             style="--cols: 1.2fr 0.9fr 0.7fr 0.7fr 0.6fr"
             type="button"
-            @click="selected = stage"
+            @click="selectedKey = buildKey(stage)"
           >
             <div class="cell-main">
               <div class="cell-title">{{ stage.name }}</div>
@@ -114,6 +94,7 @@ watch(selected, (value) => {
             <span class="badge muted">{{ stage.mode }}</span>
             <span class="muted">{{ stage.index }}</span>
           </button>
+          <div v-if="!stages.length && !isLoading" class="empty-state">No stages available.</div>
         </div>
       </div>
 
@@ -121,29 +102,29 @@ watch(selected, (value) => {
         <div class="panel-header">
           <div>
             <div class="panel-title">Stage Detail</div>
-            <div class="panel-sub">{{ selected.mission }}</div>
+            <div class="panel-sub">{{ selectedSafe.mission }}</div>
           </div>
-          <span class="badge" :class="selected.status.toLowerCase()">{{ selected.status }}</span>
+          <span class="badge" :class="String(selectedSafe.status).toLowerCase()">{{ selectedSafe.status }}</span>
         </div>
 
         <div class="detail-card">
-          <div class="detail-title">{{ selected.name }}</div>
+          <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
-            <span class="badge muted">{{ selected.mode }}</span>
-            <span class="badge">Timeout {{ selected.timeout }}</span>
+            <span class="badge muted">{{ selectedSafe.mode }}</span>
+            <span class="badge">Timeout {{ selectedSafe.timeout }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
               <span>Sequence</span>
-              <span>Stage {{ selected.index }}</span>
+              <span>Stage {{ selectedSafe.index }}</span>
             </div>
             <div class="kv">
               <span>Depends On</span>
-              <span>{{ selected.dependsOn.length ? selected.dependsOn.join(', ') : 'None' }}</span>
+              <span>{{ selectedSafe.dependsOn.length ? selectedSafe.dependsOn.join(', ') : 'None' }}</span>
             </div>
             <div class="kv">
               <span>FlightTasks</span>
-              <span>{{ selected.tasks.length }}</span>
+              <span>{{ selectedSafe.tasks.length }}</span>
             </div>
           </div>
         </div>
@@ -154,7 +135,7 @@ watch(selected, (value) => {
               <div class="panel-title">FlightTasks</div>
               <div class="panel-sub">Execution order and current node.</div>
             </div>
-            <span class="badge">{{ selected.tasks.length }} tasks</span>
+            <span class="badge">{{ selectedSafe.tasks.length }} tasks</span>
           </div>
           <div class="task-table">
             <div class="task-row task-head">
@@ -163,12 +144,13 @@ watch(selected, (value) => {
               <span>ETA</span>
               <span>Node</span>
             </div>
-            <div v-for="task in selected.tasks" :key="task.name" class="task-row">
+            <div v-for="task in selectedSafe.tasks" :key="task.name" class="task-row">
               <span class="task-name">{{ task.name }}</span>
               <span class="badge" :class="task.status.toLowerCase()">{{ task.status }}</span>
               <span>{{ task.eta }}</span>
               <span class="muted">{{ task.node }}</span>
             </div>
+            <div v-if="!selectedSafe.tasks.length" class="empty-state">No tasks available.</div>
           </div>
         </div>
       </div>

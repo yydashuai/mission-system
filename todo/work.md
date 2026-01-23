@@ -222,9 +222,16 @@
   - TopBar / SideBar / DetailPanel 组件化
   - 路由结构与页面占位（Missions/Stages/FlightTasks/Weapons/Cluster/Settings）
 
-### 2026-01-24
-
 #### 前端交互与状态联动
 - ✅ 右侧详情面板改为随页面选中项联动，不再固定显示
 - ✅ 新增 Pinia 的 focus 状态管理，Missions/Stages/FlightTasks/Weapons/Cluster 页面点击条目会更新详情
 - ✅ Cluster 节点卡片支持选中态样式
+
+#### 前端数据层与 K8s 直连调试
+- ✅ 新增 data store + seed + normalize，支持从 K8s 原生列表 items 映射到页面字段
+- ✅ API 请求支持 K8s 模式路径（`/apis` 与 `/api/v1`），新增 API_MODE/namespace 配置
+- ✅ 增加鉴权配置（AUTH_HEADER/AUTH_SCHEME/AUTH_TOKEN），请求与 healthz 检测可携带 header
+- ✅ 使用 Vite 代理解决 CORS，API_BASE 为空走同源 `/apis`/`/api` 请求
+- ✅ Sync 按钮支持立即 API 检测 + 数据刷新 + UTC 时间同步
+- ✅ Sidebar System Health 改为动态统计 nodes/events
+- ✅ 更换浏览器标签页图标与左上角品牌图标为 `空战图标.png`

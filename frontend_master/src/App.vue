@@ -4,17 +4,22 @@ import TopBar from './components/layout/TopBar.vue'
 import SideBar from './components/layout/SideBar.vue'
 import DetailPanel from './components/layout/DetailPanel.vue'
 import { useSystemStore } from './stores/system'
+import { useDataStore } from './stores/data'
 
 const systemStore = useSystemStore()
+const dataStore = useDataStore()
 
 onMounted(() => {
   systemStore.init()
   systemStore.startClock()
   systemStore.checkApi()
+  dataStore.refreshAll()
+  dataStore.startPolling()
 })
 
 onBeforeUnmount(() => {
   systemStore.stopClock()
+  dataStore.stopPolling()
 })
 </script>
 

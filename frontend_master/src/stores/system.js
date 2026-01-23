@@ -23,6 +23,17 @@ export const useSystemStore = defineStore('system', {
     refreshLabel: (state) => formatSeconds(state.config.refreshInterval),
     detailPollLabel: (state) => formatSeconds(state.config.detailPollInterval),
     modeLabel: (state) => (state.config.readOnly ? 'Read-only' : 'Read-write'),
+    authSummary: (state) => {
+      if (!state.config.authToken) return 'None'
+      const scheme = state.config.authScheme ? `${state.config.authScheme} ` : ''
+      return `${state.config.authHeader}: ${scheme}***`
+    },
+    authHeaders: (state) => {
+      if (!state.config.authToken) return {}
+      const scheme = state.config.authScheme ? `${state.config.authScheme} ` : ''
+      const value = `${scheme}${state.config.authToken}`.trim()
+      return { [state.config.authHeader]: value }
+    },
     timeLabel: (state) => formatTime(state.now),
     lastCheckedLabel: (state) => formatTime(state.lastCheckedAt),
   },
@@ -45,14 +56,8 @@ export const useSystemStore = defineStore('system', {
     },
     async checkApi() {
       this.apiMessage = ''
-      if (!this.config.apiBase) {
-        this.apiStatus = 'disabled'
-        this.lastCheckedAt = new Date()
-        return
-      }
-
       this.apiStatus = 'checking'
-      const result = await pingApi(this.config.apiBase)
+      const result = await pingApi(this.config.apiBase, { headers: this.authHeaders })
       this.lastCheckedAt = new Date()
 
       if (result.disabled) {

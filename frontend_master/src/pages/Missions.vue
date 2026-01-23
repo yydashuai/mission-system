@@ -1,85 +1,54 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useFocusStore } from '../stores/focus'
+import { useDataStore } from '../stores/data'
 
-const missions = [
-  {
-    name: 'SeaStrike-02',
-    type: 'Maritime Strike',
-    priority: 'High',
-    status: 'Running',
-    commander: 'Cmdr Lin',
-    region: 'Blue Trench',
-    updated: '08:22',
-    objective: 'Suppress carrier group radar and open strike corridor.',
-    failurePolicy: 'Continue',
-    tasks: 9,
-    stages: [
-      { name: 'Recon', mode: 'Parallel', status: 'Succeeded', tasks: 3 },
-      { name: 'Jammer', mode: 'Sequential', status: 'Running', tasks: 2 },
-      { name: 'Strike', mode: 'Parallel', status: 'Pending', tasks: 4 },
-    ],
-  },
-  {
-    name: 'PolarShield-01',
-    type: 'Air Defense',
-    priority: 'Normal',
-    status: 'Scheduled',
-    commander: 'Cmdr Zhao',
-    region: 'North Sector',
-    updated: '08:10',
-    objective: 'Maintain CAP and protect inbound convoy lanes.',
-    failurePolicy: 'Abort',
-    tasks: 6,
-    stages: [
-      { name: 'Scramble', mode: 'Parallel', status: 'Scheduled', tasks: 2 },
-      { name: 'Escort', mode: 'Parallel', status: 'Pending', tasks: 4 },
-    ],
-  },
-  {
-    name: 'HarborWatch-07',
-    type: 'ISR',
-    priority: 'Low',
-    status: 'Succeeded',
-    commander: 'Cmdr Mei',
-    region: 'Harbor Delta',
-    updated: '07:58',
-    objective: 'Confirm infrastructure damage assessment.',
-    failurePolicy: 'Continue',
-    tasks: 4,
-    stages: [
-      { name: 'Recon', mode: 'Parallel', status: 'Succeeded', tasks: 2 },
-      { name: 'Analyze', mode: 'Sequential', status: 'Succeeded', tasks: 2 },
-    ],
-  },
-  {
-    name: 'SilentPath-03',
-    type: 'Covert Ops',
-    priority: 'High',
-    status: 'Failed',
-    commander: 'Cmdr Gao',
-    region: 'Black Ridge',
-    updated: '07:40',
-    objective: 'Disable listening post without alerting patrols.',
-    failurePolicy: 'Abort',
-    tasks: 5,
-    stages: [
-      { name: 'Insertion', mode: 'Parallel', status: 'Failed', tasks: 3 },
-      { name: 'Extraction', mode: 'Parallel', status: 'Pending', tasks: 2 },
-    ],
-  },
-]
+const dataStore = useDataStore()
+const { missions } = storeToRefs(dataStore)
+const isLoading = computed(() => dataStore.loading.missions)
 
-const selected = ref(missions[0])
+const selectedKey = ref('')
 const focusStore = useFocusStore()
 
+const emptyMission = {
+  name: '--',
+  type: '--',
+  priority: '--',
+  status: '--',
+  commander: '--',
+  region: '--',
+  updated: '--',
+  objective: '--',
+  failurePolicy: '--',
+  tasks: '--',
+  stages: [],
+}
+
+const selected = computed(() => (
+  missions.value.find((item) => item.name === selectedKey.value) || null
+))
+
+const selectedSafe = computed(() => selected.value || emptyMission)
+
+watch(missions, (list) => {
+  if (!list.length) return
+  const exists = list.some((item) => item.name === selectedKey.value)
+  if (!exists) {
+    selectedKey.value = list[0].name
+  }
+}, { immediate: true })
+
 watch(selected, (value) => {
-  focusStore.setFocus('mission', value)
+  if (value) {
+    focusStore.setFocus('mission', value)
+  }
 }, { immediate: true })
 
 const priorityTone = (priority) => {
-  if (priority === 'High') return 'warn'
-  if (priority === 'Low') return 'muted'
+  const key = String(priority || '').toLowerCase()
+  if (key === 'high' || key === 'critical') return 'warn'
+  if (key === 'low') return 'muted'
   return 'ok'
 }
 </script>
@@ -104,7 +73,8 @@ const priorityTone = (priority) => {
             <div class="panel-title">Active Missions</div>
             <div class="panel-sub">Select a mission to inspect stage flow.</div>
           </div>
-          <span class="badge">4 tracked</span>
+          <span v-if="isLoading" class="badge warn">Loading</span>
+          <span v-else class="badge">{{ missions.length }} tracked</span>
         </div>
 
         <div class="data-table">
@@ -119,10 +89,10 @@ const priorityTone = (priority) => {
             v-for="mission in missions"
             :key="mission.name"
             class="data-row is-selectable"
-            :class="{ active: selected.name === mission.name }"
+            :class="{ active: selectedKey === mission.name }"
             style="--cols: 1.3fr 0.7fr 0.7fr 0.6fr 0.7fr"
             type="button"
-            @click="selected = mission"
+            @click="selectedKey = mission.name"
           >
             <div class="cell-main">
               <div class="cell-title">{{ mission.name }}</div>
@@ -133,6 +103,7 @@ const priorityTone = (priority) => {
             <span>{{ mission.stages.length }}</span>
             <span class="muted">{{ mission.updated }}</span>
           </button>
+          <div v-if="!missions.length && !isLoading" class="empty-state">No missions available.</div>
         </div>
       </div>
 
@@ -140,34 +111,34 @@ const priorityTone = (priority) => {
         <div class="panel-header">
           <div>
             <div class="panel-title">Mission Detail</div>
-            <div class="panel-sub">{{ selected.region }}</div>
+            <div class="panel-sub">{{ selectedSafe.region }}</div>
           </div>
-          <span class="badge" :class="selected.status.toLowerCase()">{{ selected.status }}</span>
+          <span class="badge" :class="String(selectedSafe.status).toLowerCase()">{{ selectedSafe.status }}</span>
         </div>
 
         <div class="detail-card">
-          <div class="detail-title">{{ selected.name }}</div>
+          <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
-            <span class="badge" :class="priorityTone(selected.priority)">{{ selected.priority }} Priority</span>
-            <span class="badge muted">{{ selected.type }}</span>
-            <span class="badge">Failure: {{ selected.failurePolicy }}</span>
+            <span class="badge" :class="priorityTone(selectedSafe.priority)">{{ selectedSafe.priority }} Priority</span>
+            <span class="badge muted">{{ selectedSafe.type }}</span>
+            <span class="badge">Failure: {{ selectedSafe.failurePolicy }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
               <span>Commander</span>
-              <span>{{ selected.commander }}</span>
+              <span>{{ selectedSafe.commander }}</span>
             </div>
             <div class="kv">
               <span>Region</span>
-              <span>{{ selected.region }}</span>
+              <span>{{ selectedSafe.region }}</span>
             </div>
             <div class="kv">
               <span>FlightTasks</span>
-              <span>{{ selected.tasks }}</span>
+              <span>{{ selectedSafe.tasks }}</span>
             </div>
             <div class="kv">
               <span>Objective</span>
-              <span>{{ selected.objective }}</span>
+              <span>{{ selectedSafe.objective }}</span>
             </div>
           </div>
         </div>
@@ -178,11 +149,11 @@ const priorityTone = (priority) => {
               <div class="panel-title">Stage Flow</div>
               <div class="panel-sub">Parallel and sequential segments.</div>
             </div>
-            <span class="badge">{{ selected.stages.length }} stages</span>
+            <span class="badge">{{ selectedSafe.stages.length }} stages</span>
           </div>
           <div class="flow-line">
             <div
-              v-for="stage in selected.stages"
+              v-for="stage in selectedSafe.stages"
               :key="stage.name"
               class="flow-node"
               :class="stage.status.toLowerCase()"
@@ -191,6 +162,7 @@ const priorityTone = (priority) => {
               <div class="flow-meta">{{ stage.mode }} · {{ stage.tasks }} tasks</div>
               <span class="badge" :class="stage.status.toLowerCase()">{{ stage.status }}</span>
             </div>
+            <div v-if="!selectedSafe.stages.length" class="empty-state">No stages available.</div>
           </div>
         </div>
       </div>

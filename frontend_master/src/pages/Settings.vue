@@ -6,6 +6,9 @@ const systemStore = useSystemStore()
 
 const config = computed(() => ([
   { label: 'API Base', value: systemStore.config.apiBase || '--' },
+  { label: 'API Mode', value: systemStore.config.apiMode },
+  { label: 'Namespace', value: systemStore.config.namespace },
+  { label: 'Auth', value: systemStore.authSummary },
   { label: 'Refresh Interval', value: systemStore.refreshLabel },
   { label: 'Detail Polling', value: systemStore.detailPollLabel },
   { label: 'Mode', value: systemStore.modeLabel },
