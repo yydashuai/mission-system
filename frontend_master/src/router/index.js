@@ -1,62 +1,43 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '../pages/Dashboard.vue'
-import Placeholder from '../pages/Placeholder.vue'
+import Missions from '../pages/Missions.vue'
+import Stages from '../pages/Stages.vue'
+import FlightTasks from '../pages/FlightTasks.vue'
+import Weapons from '../pages/Weapons.vue'
+import Cluster from '../pages/Cluster.vue'
+import Settings from '../pages/Settings.vue'
 
 const routes = [
   { path: '/', name: 'dashboard', component: Dashboard },
   {
     path: '/missions',
     name: 'missions',
-    component: Placeholder,
-    props: {
-      title: 'Missions',
-      subtitle: 'Mission list, lifecycle, and stage composition.',
-    },
+    component: Missions,
   },
   {
     path: '/stages',
     name: 'stages',
-    component: Placeholder,
-    props: {
-      title: 'MissionStages',
-      subtitle: 'Stage execution flow and dependencies.',
-    },
+    component: Stages,
   },
   {
     path: '/flighttasks',
     name: 'flighttasks',
-    component: Placeholder,
-    props: {
-      title: 'FlightTasks',
-      subtitle: 'Scheduling detail, pod binding, and status.',
-    },
+    component: FlightTasks,
   },
   {
     path: '/weapons',
     name: 'weapons',
-    component: Placeholder,
-    props: {
-      title: 'Weapons',
-      subtitle: 'Compatibility, container spec, and usage.',
-    },
+    component: Weapons,
   },
   {
     path: '/cluster',
     name: 'cluster',
-    component: Placeholder,
-    props: {
-      title: 'Cluster',
-      subtitle: 'Nodes, pods, events, and basic health.',
-    },
+    component: Cluster,
   },
   {
     path: '/settings',
     name: 'settings',
-    component: Placeholder,
-    props: {
-      title: 'Settings',
-      subtitle: 'API connectivity, refresh, and access.',
-    },
+    component: Settings,
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

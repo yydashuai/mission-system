@@ -205,8 +205,11 @@
 - ✅ FlightTask：Pod 创建失败（Invalid）时，写入 `PodCreated=False` 条件并将任务置为 Failed，避免卡在 Scheduled
 - ✅ CRD：为 Mission/MissionStage/FlightTask/Weapon 增加 `Phase` 列（`kubectl get` 可直接看到 status.phase）
 - ✅ Mission failurePolicy：新增 `stageFailureAction=continue` 分支，阶段失败后允许依赖阶段继续推进且任务不中断
-
----
+#### 验证基本功能
+- ✅ 执行 `kubectl get pod -w` 观察：stage1 全部完成后 stage2 串行推进，stage2 完成后 stage3 并行启动
+- ✅ 所有阶段 Pod 均创建并完成（Completed），链路推进正常
+- ✅ 阶段类型调整为并行 → 串行 → 并行，并配置依赖关系（stage2 依赖 stage1，stage3 依赖 stage2）
+- ✅ 每个任务补齐 `podTemplate`，使用短时 `sleep 5` 便于快速验证链路推进
 
 ### 2026-01-23
 
@@ -218,9 +221,10 @@
 - ✅ 引入 Vue Router + Pinia，拆分布局组件
   - TopBar / SideBar / DetailPanel 组件化
   - 路由结构与页面占位（Missions/Stages/FlightTasks/Weapons/Cluster/Settings）
-- ✅ 阶段类型调整为并行 → 串行 → 并行，并配置依赖关系（stage2 依赖 stage1，stage3 依赖 stage2）
-- ✅ 每个任务补齐 `podTemplate`，使用短时 `sleep 5` 便于快速验证链路推进
 
-#### 验证基本功能
-- ✅ 执行 `kubectl get pod -w` 观察：stage1 全部完成后 stage2 串行推进，stage2 完成后 stage3 并行启动
-- ✅ 所有阶段 Pod 均创建并完成（Completed），链路推进正常
+### 2026-01-24
+
+#### 前端交互与状态联动
+- ✅ 右侧详情面板改为随页面选中项联动，不再固定显示
+- ✅ 新增 Pinia 的 focus 状态管理，Missions/Stages/FlightTasks/Weapons/Cluster 页面点击条目会更新详情
+- ✅ Cluster 节点卡片支持选中态样式
