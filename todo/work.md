@@ -235,3 +235,15 @@
 - ✅ Sync 按钮支持立即 API 检测 + 数据刷新 + UTC 时间同步
 - ✅ Sidebar System Health 改为动态统计 nodes/events
 - ✅ 更换浏览器标签页图标与左上角品牌图标为 `空战图标.png`
+- ✅ MissionStage CRD 增加 dependsOn 字段，controller 同步写入并在前端展示依赖信息
+
+### 2026-01-25
+
+#### 前端 metrics server 对接
+- ✅ 接入 `metrics.k8s.io/v1beta1` 节点指标，计算 CPU/内存使用百分比
+- ✅ Data store 合并 Node 列表与 metrics，Cluster 页面实时展示 CPU/Memory
+- ✅ 统计 Running Pods 数量并写回 Node `pods` 展示
+
+#### 前端刷新体验优化
+- ✅ 轮询刷新时保留旧数据，仅在首次加载显示 Loading，减少列表闪烁
+- ✅ API 状态轮询改为静默更新，避免 Sidebar 在检查时闪烁

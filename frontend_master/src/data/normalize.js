@@ -36,6 +36,62 @@ const formatTime = (value) => {
   return date.toISOString().slice(11, 16)
 }
 
+const parseQuantity = (value) => {
+  if (value === undefined || value === null || value === '') return null
+  const text = String(value).trim()
+  const match = text.match(/^([0-9.]+)([a-zA-Z]+)?$/)
+  if (!match) return null
+  const number = Number(match[1])
+  if (!Number.isFinite(number)) return null
+  return { number, unit: match[2] || '' }
+}
+
+const parseCpuCores = (value) => {
+  const parsed = parseQuantity(value)
+  if (!parsed) return null
+  const scale = {
+    n: 1e-9,
+    u: 1e-6,
+    m: 1e-3,
+    '': 1,
+    k: 1e3,
+    M: 1e6,
+    G: 1e9,
+    T: 1e12,
+    P: 1e15,
+    E: 1e18,
+  }
+  if (!Object.prototype.hasOwnProperty.call(scale, parsed.unit)) return null
+  return parsed.number * scale[parsed.unit]
+}
+
+const parseMemoryBytes = (value) => {
+  const parsed = parseQuantity(value)
+  if (!parsed) return null
+  const scale = {
+    '': 1,
+    Ki: 1024,
+    Mi: 1024 ** 2,
+    Gi: 1024 ** 3,
+    Ti: 1024 ** 4,
+    Pi: 1024 ** 5,
+    Ei: 1024 ** 6,
+    K: 1e3,
+    M: 1e6,
+    G: 1e9,
+    T: 1e12,
+    P: 1e15,
+    E: 1e18,
+  }
+  if (!Object.prototype.hasOwnProperty.call(scale, parsed.unit)) return null
+  return parsed.number * scale[parsed.unit]
+}
+
+const toPercent = (used, capacity) => {
+  if (!Number.isFinite(used) || !Number.isFinite(capacity) || capacity <= 0) return 0
+  return Math.min(100, Math.round((used / capacity) * 100))
+}
+
 const metaValue = (item, key) => (
   item?.metadata?.labels?.[key] || item?.metadata?.annotations?.[key] || ''
 )
@@ -46,6 +102,31 @@ const normalizeList = (payload) => {
   if (Array.isArray(payload)) return payload
   if (payload && Array.isArray(payload.items)) return payload.items
   return []
+}
+
+const buildMetricsIndex = (payload) => {
+  const list = normalizeList(payload)
+  const map = new Map()
+  list.forEach((item) => {
+    const name = item?.metadata?.name
+    if (!name) return
+    map.set(name, item.usage || {})
+  })
+  return map
+}
+
+const buildPodUsageIndex = (payload) => {
+  if (!payload) return { map: new Map(), available: false }
+  const list = normalizeList(payload)
+  const map = new Map()
+  list.forEach((item) => {
+    const nodeName = item?.spec?.nodeName
+    if (!nodeName) return
+    const phase = item?.status?.phase || ''
+    if (phase !== 'Running') return
+    map.set(nodeName, (map.get(nodeName) || 0) + 1)
+  })
+  return { map, available: true }
 }
 
 const buildObjective = (objective) => {
@@ -77,6 +158,7 @@ const buildMissionStages = (specStages, summary) => {
     mode: stageTypeLabel(stage.type),
     status: phaseLabel(summaryMap.get(stage.name) || 'Pending'),
     tasks: Array.isArray(stage.flightTasks) ? stage.flightTasks.length : 0,
+    dependsOn: Array.isArray(stage.dependsOn) ? stage.dependsOn : [],
   }))
 }
 
@@ -235,7 +317,7 @@ export const normalizeStageList = (payload) => {
       mode: stageTypeLabel(spec.stageType),
       status: phaseLabel(status.phase),
       timeout: spec.config?.timeout || '--',
-      dependsOn: [],
+      dependsOn: Array.isArray(spec.dependsOn) ? spec.dependsOn : [],
       tasks: buildStageTasks(status.flightTasksStatus, spec.flightTasks),
     }
   })
@@ -292,23 +374,35 @@ export const normalizeWeaponList = (payload) => {
   })
 }
 
-export const normalizeNodeList = (payload) => {
+export const normalizeNodeList = (payload, metricsPayload = null, podsPayload = null) => {
   const list = normalizeList(payload)
   if (!list.length) return []
   if (!list[0]?.metadata) return list
 
+  const metricsIndex = buildMetricsIndex(metricsPayload)
+  const podUsage = buildPodUsageIndex(podsPayload)
+
   return list.map((item) => {
     const labels = item.metadata?.labels || {}
     const capacity = item.status?.capacity || {}
-    const podsCap = capacity.pods || '--'
+    const allocatable = item.status?.allocatable || {}
+    const podsCap = allocatable.pods || capacity.pods || '--'
+    const name = item.metadata?.name || '--'
+    const usage = metricsIndex.get(name) || {}
+    const cpuUsed = parseCpuCores(usage.cpu)
+    const cpuCap = parseCpuCores(allocatable.cpu || capacity.cpu)
+    const memoryUsed = parseMemoryBytes(usage.memory)
+    const memoryCap = parseMemoryBytes(allocatable.memory || capacity.memory)
+    const podsUsed = podUsage.map.get(name)
+    const podsUsedLabel = podUsage.available ? (podsUsed ?? 0) : '--'
 
     return {
-      name: item.metadata?.name || '--',
+      name,
       role: buildNodeRole(labels),
       status: buildNodeStatus(item.status?.conditions),
-      cpu: 0,
-      memory: 0,
-      pods: `0 / ${podsCap}`,
+      cpu: toPercent(cpuUsed, cpuCap),
+      memory: toPercent(memoryUsed, memoryCap),
+      pods: `${podsUsedLabel} / ${podsCap}`,
       zone: buildNodeZone(labels),
     }
   })

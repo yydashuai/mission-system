@@ -12,13 +12,14 @@ const dataStore = useDataStore()
 onMounted(() => {
   systemStore.init()
   systemStore.startClock()
-  systemStore.checkApi()
+  systemStore.startApiPolling()
   dataStore.refreshAll()
   dataStore.startPolling()
 })
 
 onBeforeUnmount(() => {
   systemStore.stopClock()
+  systemStore.stopApiPolling()
   dataStore.stopPolling()
 })
 </script>

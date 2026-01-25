@@ -3,6 +3,7 @@ import { loadAppConfig } from '../utils/config'
 import { pingApi } from '../services/api'
 
 let clockTimer = null
+let apiTimer = null
 
 const formatTime = (date) => {
   if (!date) return '--'
@@ -54,9 +55,26 @@ export const useSystemStore = defineStore('system', {
       clearInterval(clockTimer)
       clockTimer = null
     },
-    async checkApi() {
+    startApiPolling() {
+      if (apiTimer) return
+      const interval = this.config.refreshInterval
+      if (!interval || interval <= 0) return
+      this.checkApi({ silent: true })
+      apiTimer = setInterval(() => {
+        this.checkApi({ silent: true })
+      }, interval)
+    },
+    stopApiPolling() {
+      if (!apiTimer) return
+      clearInterval(apiTimer)
+      apiTimer = null
+    },
+    async checkApi(options = {}) {
+      const silent = options.silent === true
       this.apiMessage = ''
-      this.apiStatus = 'checking'
+      if (!silent) {
+        this.apiStatus = 'checking'
+      }
       const result = await pingApi(this.config.apiBase, { headers: this.authHeaders })
       this.lastCheckedAt = new Date()
 

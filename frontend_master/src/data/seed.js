@@ -11,9 +11,9 @@ export const seedMissions = [
     failurePolicy: 'Continue',
     tasks: 9,
     stages: [
-      { name: 'Recon', mode: 'Parallel', status: 'Succeeded', tasks: 3 },
-      { name: 'Jammer', mode: 'Sequential', status: 'Running', tasks: 2 },
-      { name: 'Strike', mode: 'Parallel', status: 'Pending', tasks: 4 },
+      { name: 'Recon', mode: 'Parallel', status: 'Succeeded', tasks: 3, dependsOn: [] },
+      { name: 'Jammer', mode: 'Sequential', status: 'Running', tasks: 2, dependsOn: ['Recon'] },
+      { name: 'Strike', mode: 'Parallel', status: 'Pending', tasks: 4, dependsOn: ['Jammer'] },
     ],
   },
   {
@@ -28,8 +28,8 @@ export const seedMissions = [
     failurePolicy: 'Abort',
     tasks: 6,
     stages: [
-      { name: 'Scramble', mode: 'Parallel', status: 'Scheduled', tasks: 2 },
-      { name: 'Escort', mode: 'Parallel', status: 'Pending', tasks: 4 },
+      { name: 'Scramble', mode: 'Parallel', status: 'Scheduled', tasks: 2, dependsOn: [] },
+      { name: 'Escort', mode: 'Parallel', status: 'Pending', tasks: 4, dependsOn: ['Scramble'] },
     ],
   },
   {
@@ -44,8 +44,8 @@ export const seedMissions = [
     failurePolicy: 'Continue',
     tasks: 4,
     stages: [
-      { name: 'Recon', mode: 'Parallel', status: 'Succeeded', tasks: 2 },
-      { name: 'Analyze', mode: 'Sequential', status: 'Succeeded', tasks: 2 },
+      { name: 'Recon', mode: 'Parallel', status: 'Succeeded', tasks: 2, dependsOn: [] },
+      { name: 'Analyze', mode: 'Sequential', status: 'Succeeded', tasks: 2, dependsOn: ['Recon'] },
     ],
   },
   {
@@ -60,8 +60,8 @@ export const seedMissions = [
     failurePolicy: 'Abort',
     tasks: 5,
     stages: [
-      { name: 'Insertion', mode: 'Parallel', status: 'Failed', tasks: 3 },
-      { name: 'Extraction', mode: 'Parallel', status: 'Pending', tasks: 2 },
+      { name: 'Insertion', mode: 'Parallel', status: 'Failed', tasks: 3, dependsOn: [] },
+      { name: 'Extraction', mode: 'Parallel', status: 'Pending', tasks: 2, dependsOn: ['Insertion'] },
     ],
   },
 ]

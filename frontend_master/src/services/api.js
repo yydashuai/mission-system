@@ -51,6 +51,8 @@ const resolveResourcePath = (resource, options = {}) => {
     if (resource === 'flighttasks') return `${base}/flighttasks`
     if (resource === 'weapons') return `${base}/weapons`
     if (resource === 'nodes') return '/api/v1/nodes'
+    if (resource === 'nodeMetrics') return '/apis/metrics.k8s.io/v1beta1/nodes'
+    if (resource === 'pods') return '/api/v1/pods'
     if (resource === 'events') return `/api/v1/namespaces/${namespace}/events`
   }
 
@@ -59,6 +61,8 @@ const resolveResourcePath = (resource, options = {}) => {
   if (resource === 'flighttasks') return '/api/flighttasks'
   if (resource === 'weapons') return '/api/weapons'
   if (resource === 'nodes') return '/api/cluster/nodes'
+  if (resource === 'nodeMetrics') return '/api/cluster/metrics/nodes'
+  if (resource === 'pods') return '/api/cluster/pods'
   if (resource === 'events') return '/api/cluster/events'
   return ''
 }
@@ -106,6 +110,18 @@ export const getWeapons = async (baseUrl, options = {}) => (
 
 export const getClusterNodes = async (baseUrl, options = {}) => (
   fetchJson(buildUrl(baseUrl, resolveResourcePath('nodes', options)), {
+    headers: options.headers,
+  })
+)
+
+export const getClusterNodeMetrics = async (baseUrl, options = {}) => (
+  fetchJson(buildUrl(baseUrl, resolveResourcePath('nodeMetrics', options)), {
+    headers: options.headers,
+  })
+)
+
+export const getClusterPods = async (baseUrl, options = {}) => (
+  fetchJson(buildUrl(baseUrl, resolveResourcePath('pods', options)), {
     headers: options.headers,
   })
 )

@@ -102,6 +102,7 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					StageName:   stage.DisplayName,
 					StageIndex:  int32(index + 1),
 					StageType:   stage.Type,
+					DependsOn:   stage.DependsOn,
 					FlightTasks: flightTasks,
 					Config: &airforcev1alpha1.MissionStageConfig{
 						Timeout: stage.Timeout,
@@ -157,6 +158,10 @@ func (r *MissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		if missionStage.Spec.StageType != stage.Type {
 			missionStage.Spec.StageType = stage.Type
+			changed = true
+		}
+		if !stringSliceEqual(missionStage.Spec.DependsOn, stage.DependsOn) {
+			missionStage.Spec.DependsOn = stage.DependsOn
 			changed = true
 		}
 		desiredFlightTasks := normalizeStageFlightTasks(stage.FlightTasks)
@@ -453,6 +458,18 @@ func missionStageFlightTasksEqual(a, b []airforcev1alpha1.MissionStageFlightTask
 			if b[i].TaskParams[k] != v {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
 		}
 	}
 	return true

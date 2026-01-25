@@ -92,6 +92,8 @@ type MissionStageSpec struct {
 	// +kubebuilder:validation:Enum=sequential;parallel;mixed
 	StageType StageExecutionType `json:"stageType,omitempty"`
 
+	DependsOn []string `json:"dependsOn,omitempty"`
+
 	FlightTasks []MissionStageFlightTaskTemplate `json:"flightTasks,omitempty"`
 
 	Config *MissionStageConfig `json:"config,omitempty"`

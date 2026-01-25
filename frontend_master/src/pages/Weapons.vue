@@ -9,6 +9,10 @@ const { weapons } = storeToRefs(dataStore)
 const isLoading = computed(() => dataStore.loading.weapons)
 
 const selectedKey = ref('')
+const query = ref('')
+const statusFilter = ref('all')
+const sortKey = ref('name')
+const sortDir = ref('asc')
 const focusStore = useFocusStore()
 
 const emptyWeapon = {
@@ -22,14 +26,99 @@ const emptyWeapon = {
   resources: '--',
 }
 
+const statusOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'Available', label: 'Available' },
+  { value: 'Updating', label: 'Updating' },
+  { value: 'Degraded', label: 'Degraded' },
+  { value: 'Deprecated', label: 'Deprecated' },
+  { value: 'Retired', label: 'Retired' },
+]
+
+const statusScore = (value) => {
+  const key = String(value || '').toLowerCase()
+  if (key === 'available') return 5
+  if (key === 'updating') return 4
+  if (key === 'degraded') return 3
+  if (key === 'deprecated') return 2
+  if (key === 'retired') return 1
+  return 0
+}
+
+const usageScore = (value) => {
+  if (!value) return 0
+  const match = String(value).match(/\d+/)
+  return match ? Number(match[0]) : 0
+}
+
+const weaponCounts = computed(() => {
+  const counts = { all: weapons.value.length }
+  weapons.value.forEach((weapon) => {
+    const key = weapon.status || 'Unknown'
+    counts[key] = (counts[key] || 0) + 1
+  })
+  return counts
+})
+
+const filteredWeapons = computed(() => {
+  const text = String(query.value || '').trim().toLowerCase()
+  let list = weapons.value
+
+  if (text) {
+    list = list.filter((weapon) => {
+      const haystack = [weapon.name, weapon.image, weapon.version, weapon.resources]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(text)
+    })
+  }
+
+  if (statusFilter.value !== 'all') {
+    list = list.filter((weapon) => weapon.status === statusFilter.value)
+  }
+
+  const sorted = [...list].sort((a, b) => {
+    const aValue = (() => {
+      if (sortKey.value === 'status') return statusScore(a.status)
+      if (sortKey.value === 'usage') return usageScore(a.usage)
+      if (sortKey.value === 'version') return a.version
+      return a.name
+    })()
+
+    const bValue = (() => {
+      if (sortKey.value === 'status') return statusScore(b.status)
+      if (sortKey.value === 'usage') return usageScore(b.usage)
+      if (sortKey.value === 'version') return b.version
+      return b.name
+    })()
+
+    let result = 0
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      result = aValue - bValue
+    } else {
+      result = String(aValue).localeCompare(String(bValue))
+    }
+    return sortDir.value === 'asc' ? result : -result
+  })
+
+  return sorted
+})
+
 const selected = computed(() => (
-  weapons.value.find((item) => item.name === selectedKey.value) || null
+  filteredWeapons.value.find((item) => item.name === selectedKey.value) || null
 ))
 
 const selectedSafe = computed(() => selected.value || emptyWeapon)
 
-watch(weapons, (list) => {
-  if (!list.length) return
+const toggleSort = () => {
+  sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+}
+
+watch(filteredWeapons, (list) => {
+  if (!list.length) {
+    selectedKey.value = ''
+    return
+  }
   const exists = list.some((item) => item.name === selectedKey.value)
   if (!exists) {
     selectedKey.value = list[0].name
@@ -65,24 +154,61 @@ const statusTone = (status) => {
 
     <section class="split-grid">
       <div class="panel">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Weapon Registry</div>
-            <div class="panel-sub">Sidecar packages available to FlightTasks.</div>
-          </div>
-          <span v-if="isLoading" class="badge warn">Loading</span>
-          <span v-else class="badge">{{ weapons.length }} packages</span>
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Weapon Registry</div>
+          <div class="panel-sub">Sidecar packages available to FlightTasks.</div>
         </div>
-        <div class="data-table">
-          <div class="data-row is-head" style="--cols: 1.1fr 0.8fr 0.9fr 0.7fr 0.7fr">
-            <span>Weapon</span>
-            <span>Status</span>
+        <span v-if="isLoading" class="badge warn">Loading</span>
+        <span v-else class="badge">{{ filteredWeapons.length }} / {{ weapons.length }} packages</span>
+      </div>
+      <div class="panel-toolbar">
+        <div class="filter-row">
+          <input
+            v-model="query"
+            class="input"
+            type="search"
+            placeholder="Search weapon, image, resources"
+          />
+          <div class="segmented">
+            <button
+              v-for="option in statusOptions"
+              :key="option.value"
+              type="button"
+              class="segmented-btn"
+              :class="{ active: statusFilter === option.value }"
+              @click="statusFilter = option.value"
+            >
+              <span>{{ option.label }}</span>
+              <span class="count-pill">{{ weaponCounts[option.value] || 0 }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label">Sort</span>
+            <select v-model="sortKey" class="select">
+              <option value="name">Name</option>
+              <option value="status">Status</option>
+              <option value="usage">Usage</option>
+              <option value="version">Version</option>
+            </select>
+            <button type="button" class="ghost small" @click="toggleSort">
+              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="data-table">
+        <div class="data-row is-head" style="--cols: 1.1fr 0.8fr 0.9fr 0.7fr 0.7fr">
+          <span>Weapon</span>
+          <span>Status</span>
             <span>Image</span>
             <span>Version</span>
             <span>Usage</span>
           </div>
           <button
-            v-for="weapon in weapons"
+            v-for="weapon in filteredWeapons"
             :key="weapon.name"
             class="data-row is-selectable"
             :class="{ active: selectedKey === weapon.name }"
@@ -99,7 +225,9 @@ const statusTone = (status) => {
             <span class="muted">{{ weapon.version }}</span>
             <span class="badge muted">{{ weapon.usage }}</span>
           </button>
-          <div v-if="!weapons.length && !isLoading" class="empty-state">No weapons available.</div>
+          <div v-if="!filteredWeapons.length && !isLoading" class="empty-state">
+            No weapons match the current filters.
+          </div>
         </div>
       </div>
 

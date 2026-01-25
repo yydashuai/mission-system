@@ -610,11 +610,11 @@ func syncFailedSchedulingCondition(task *airforcev1alpha1.FlightTask, pod *corev
 	}
 
 	cond := metav1.Condition{
-		Type:               "FailedScheduling",
+		Type:               "NoFailedScheduling",
 		ObservedGeneration: task.Generation,
 	}
 	if summary.Attempts > 0 {
-		cond.Status = metav1.ConditionTrue
+		cond.Status = metav1.ConditionFalse
 		cond.Reason = summary.LastReason
 		if cond.Reason == "" {
 			cond.Reason = "FailedScheduling"
@@ -624,12 +624,14 @@ func syncFailedSchedulingCondition(task *airforcev1alpha1.FlightTask, pod *corev
 		if summary.LastEventTime != nil {
 			ts = *summary.LastEventTime
 		}
+		removeCondition(&task.Status.Conditions, "FailedScheduling")
 		return setConditionWithTime(&task.Status.Conditions, cond, ts)
 	}
 
-	cond.Status = metav1.ConditionFalse
+	cond.Status = metav1.ConditionTrue
 	cond.Reason = "NoFailedSchedulingEvents"
 	cond.Message = "No FailedScheduling events observed"
+	removeCondition(&task.Status.Conditions, "FailedScheduling")
 	return setConditionWithTime(&task.Status.Conditions, cond, metav1.Now())
 }
 
@@ -680,9 +682,12 @@ func imagePullFailure(pod *corev1.Pod) (string, string, bool) {
 }
 
 func syncImagePullFailedCondition(task *airforcev1alpha1.FlightTask, failed bool, reason, message string) bool {
-	existing := apimeta.FindStatusCondition(task.Status.Conditions, "ImagePullFailed")
+	existing := apimeta.FindStatusCondition(task.Status.Conditions, "NoImagePullError")
+	if existing == nil {
+		existing = apimeta.FindStatusCondition(task.Status.Conditions, "ImagePullFailed")
+	}
 	cond := metav1.Condition{
-		Type:               "ImagePullFailed",
+		Type:               "NoImagePullError",
 		ObservedGeneration: task.Generation,
 	}
 	var transitionTime metav1.Time
@@ -690,7 +695,7 @@ func syncImagePullFailedCondition(task *airforcev1alpha1.FlightTask, failed bool
 		transitionTime = existing.LastTransitionTime
 	}
 	if failed {
-		cond.Status = metav1.ConditionTrue
+		cond.Status = metav1.ConditionFalse
 		cond.Reason = reason
 		if cond.Reason == "" {
 			cond.Reason = "ImagePullFailed"
@@ -703,15 +708,17 @@ func syncImagePullFailedCondition(task *airforcev1alpha1.FlightTask, failed bool
 		if existing == nil || existing.Status != cond.Status || existing.Reason != cond.Reason || existing.Message != cond.Message {
 			transitionTime = metav1.Now()
 		}
+		removeCondition(&task.Status.Conditions, "ImagePullFailed")
 		return setConditionWithTime(&task.Status.Conditions, cond, transitionTime)
 	}
 
-	cond.Status = metav1.ConditionFalse
+	cond.Status = metav1.ConditionTrue
 	cond.Reason = "NoImagePullError"
 	cond.Message = "no image pull errors observed"
 	if existing == nil || existing.Status != cond.Status || existing.Reason != cond.Reason || existing.Message != cond.Message {
 		transitionTime = metav1.Now()
 	}
+	removeCondition(&task.Status.Conditions, "ImagePullFailed")
 	return setConditionWithTime(&task.Status.Conditions, cond, transitionTime)
 }
 
@@ -752,6 +759,19 @@ func setConditionWithTime(conditions *[]metav1.Condition, cond metav1.Condition,
 	}
 	*conditions = append(*conditions, cond)
 	return true
+}
+
+func removeCondition(conditions *[]metav1.Condition, condType string) bool {
+	if conditions == nil {
+		return false
+	}
+	for i := range *conditions {
+		if (*conditions)[i].Type == condType {
+			*conditions = append((*conditions)[:i], (*conditions)[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func applyAircraftSchedulingConstraints(pod *corev1.Pod, req airforcev1alpha1.AircraftRequirement) {

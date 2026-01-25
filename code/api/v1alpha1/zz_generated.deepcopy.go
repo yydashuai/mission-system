@@ -690,6 +690,11 @@ func (in *MissionStageRef) DeepCopy() *MissionStageRef {
 func (in *MissionStageSpec) DeepCopyInto(out *MissionStageSpec) {
 	*out = *in
 	out.MissionRef = in.MissionRef
+	if in.DependsOn != nil {
+		in, out := &in.DependsOn, &out.DependsOn
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.FlightTasks != nil {
 		in, out := &in.FlightTasks, &out.FlightTasks
 		*out = make([]MissionStageFlightTaskTemplate, len(*in))

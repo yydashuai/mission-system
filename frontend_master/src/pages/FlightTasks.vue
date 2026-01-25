@@ -9,6 +9,12 @@ const { flightTasks } = storeToRefs(dataStore)
 const isLoading = computed(() => dataStore.loading.flightTasks)
 
 const selectedKey = ref('')
+const query = ref('')
+const statusFilter = ref('all')
+const missionFilter = ref('all')
+const stageFilter = ref('all')
+const sortKey = ref('scheduledAt')
+const sortDir = ref('desc')
 const focusStore = useFocusStore()
 
 const emptyTask = {
@@ -27,14 +33,134 @@ const emptyTask = {
   sidecars: [],
 }
 
+const statusOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'Running', label: 'Running' },
+  { value: 'Scheduled', label: 'Scheduled' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Succeeded', label: 'Succeeded' },
+  { value: 'Failed', label: 'Failed' },
+]
+
+const statusScore = (value) => {
+  const key = String(value || '').toLowerCase()
+  if (key === 'succeeded') return 5
+  if (key === 'running') return 4
+  if (key === 'scheduled') return 3
+  if (key === 'pending') return 2
+  if (key === 'failed') return 1
+  return 0
+}
+
+const timeScore = (value) => {
+  if (!value || value === '--') return 0
+  const parts = String(value).split(':')
+  if (parts.length === 2) {
+    const hours = Number(parts[0])
+    const minutes = Number(parts[1])
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      return hours * 60 + minutes
+    }
+  }
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) return date.getTime()
+  return 0
+}
+
+const taskCounts = computed(() => {
+  const counts = { all: flightTasks.value.length }
+  flightTasks.value.forEach((task) => {
+    const key = task.status || 'Unknown'
+    counts[key] = (counts[key] || 0) + 1
+  })
+  return counts
+})
+
+const missionOptions = computed(() => {
+  const set = new Set()
+  flightTasks.value.forEach((task) => {
+    if (task.mission && task.mission !== '--') set.add(task.mission)
+  })
+  return ['all', ...Array.from(set).sort((a, b) => a.localeCompare(b))]
+})
+
+const stageOptions = computed(() => {
+  const set = new Set()
+  flightTasks.value.forEach((task) => {
+    if (task.stage && task.stage !== '--') set.add(task.stage)
+  })
+  return ['all', ...Array.from(set).sort((a, b) => a.localeCompare(b))]
+})
+
+const filteredTasks = computed(() => {
+  const text = String(query.value || '').trim().toLowerCase()
+  let list = flightTasks.value
+
+  if (text) {
+    list = list.filter((task) => {
+      const haystack = [task.name, task.mission, task.stage, task.weapon, task.node]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(text)
+    })
+  }
+
+  if (statusFilter.value !== 'all') {
+    list = list.filter((task) => task.status === statusFilter.value)
+  }
+
+  if (missionFilter.value !== 'all') {
+    list = list.filter((task) => task.mission === missionFilter.value)
+  }
+
+  if (stageFilter.value !== 'all') {
+    list = list.filter((task) => task.stage === stageFilter.value)
+  }
+
+  const sorted = [...list].sort((a, b) => {
+    const aValue = (() => {
+      if (sortKey.value === 'name') return a.name
+      if (sortKey.value === 'status') return statusScore(a.status)
+      if (sortKey.value === 'attempts') return a.attempts || 0
+      if (sortKey.value === 'node') return a.node
+      return timeScore(a.scheduledAt)
+    })()
+
+    const bValue = (() => {
+      if (sortKey.value === 'name') return b.name
+      if (sortKey.value === 'status') return statusScore(b.status)
+      if (sortKey.value === 'attempts') return b.attempts || 0
+      if (sortKey.value === 'node') return b.node
+      return timeScore(b.scheduledAt)
+    })()
+
+    let result = 0
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      result = aValue - bValue
+    } else {
+      result = String(aValue).localeCompare(String(bValue))
+    }
+    return sortDir.value === 'asc' ? result : -result
+  })
+
+  return sorted
+})
+
 const selected = computed(() => (
-  flightTasks.value.find((item) => item.name === selectedKey.value) || null
+  filteredTasks.value.find((item) => item.name === selectedKey.value) || null
 ))
 
 const selectedSafe = computed(() => selected.value || emptyTask)
 
-watch(flightTasks, (list) => {
-  if (!list.length) return
+const toggleSort = () => {
+  sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+}
+
+watch(filteredTasks, (list) => {
+  if (!list.length) {
+    selectedKey.value = ''
+    return
+  }
   const exists = list.some((item) => item.name === selectedKey.value)
   if (!exists) {
     selectedKey.value = list[0].name
@@ -63,24 +189,78 @@ watch(selected, (value) => {
 
     <section class="split-grid">
       <div class="panel">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Task Queue</div>
-            <div class="panel-sub">Select a task for scheduling context.</div>
-          </div>
-          <span v-if="isLoading" class="badge warn">Loading</span>
-          <span v-else class="badge">{{ flightTasks.length }} tasks</span>
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Task Queue</div>
+          <div class="panel-sub">Select a task for scheduling context.</div>
         </div>
-        <div class="data-table">
-          <div class="data-row is-head" style="--cols: 1.2fr 0.8fr 0.7fr 0.7fr 0.6fr">
-            <span>Task</span>
-            <span>Stage</span>
+        <span v-if="isLoading" class="badge warn">Loading</span>
+        <span v-else class="badge">{{ filteredTasks.length }} / {{ flightTasks.length }} tasks</span>
+      </div>
+      <div class="panel-toolbar">
+        <div class="filter-row">
+          <input
+            v-model="query"
+            class="input"
+            type="search"
+            placeholder="Search task, mission, weapon, node"
+          />
+          <div class="segmented">
+            <button
+              v-for="option in statusOptions"
+              :key="option.value"
+              type="button"
+              class="segmented-btn"
+              :class="{ active: statusFilter === option.value }"
+              @click="statusFilter = option.value"
+            >
+              <span>{{ option.label }}</span>
+              <span class="count-pill">{{ taskCounts[option.value] || 0 }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label">Mission</span>
+            <select v-model="missionFilter" class="select">
+              <option v-for="mission in missionOptions" :key="mission" :value="mission">
+                {{ mission === 'all' ? 'All missions' : mission }}
+              </option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Stage</span>
+            <select v-model="stageFilter" class="select">
+              <option v-for="stage in stageOptions" :key="stage" :value="stage">
+                {{ stage === 'all' ? 'All stages' : stage }}
+              </option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Sort</span>
+            <select v-model="sortKey" class="select">
+              <option value="scheduledAt">Scheduled</option>
+              <option value="name">Name</option>
+              <option value="status">Status</option>
+              <option value="attempts">Attempts</option>
+              <option value="node">Node</option>
+            </select>
+            <button type="button" class="ghost small" @click="toggleSort">
+              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="data-table">
+        <div class="data-row is-head" style="--cols: 1.2fr 0.8fr 0.7fr 0.7fr 0.6fr">
+          <span>Task</span>
+          <span>Stage</span>
             <span>Status</span>
             <span>Node</span>
             <span>Weapon</span>
           </div>
           <button
-            v-for="task in flightTasks"
+            v-for="task in filteredTasks"
             :key="task.name"
             class="data-row is-selectable"
             :class="{ active: selectedKey === task.name }"
@@ -97,7 +277,9 @@ watch(selected, (value) => {
             <span class="muted">{{ task.node }}</span>
             <span class="badge muted">{{ task.weapon }}</span>
           </button>
-          <div v-if="!flightTasks.length && !isLoading" class="empty-state">No tasks available.</div>
+          <div v-if="!filteredTasks.length && !isLoading" class="empty-state">
+            No tasks match the current filters.
+          </div>
         </div>
       </div>
 

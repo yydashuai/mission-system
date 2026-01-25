@@ -85,16 +85,24 @@ const tasks = [
         </div>
         <div class="task-table">
           <div class="task-row task-head">
-            <span>Name</span>
-            <span>Status</span>
-            <span>ETA</span>
-            <span>Node</span>
+            <div class="cell-start">Name</div>
+            <div class="cell-center">Status</div>
+            <div class="cell-center">ETA</div>
+            <div class="cell-center">Node</div>
           </div>
           <div v-for="task in tasks" :key="task.name" class="task-row">
-            <span class="task-name">{{ task.name }}</span>
-            <span class="badge" :class="task.status.toLowerCase()">{{ task.status }}</span>
-            <span>{{ task.eta }}</span>
-            <span class="muted">{{ task.node }}</span>
+            <div class="cell-start">
+              <span class="task-name">{{ task.name }}</span>
+            </div>
+            <div class="cell-center">
+              <span class="badge" :class="task.status.toLowerCase()">{{ task.status }}</span>
+            </div>
+            <div class="cell-center">
+              <span>{{ task.eta }}</span>
+            </div>
+            <div class="cell-center">
+              <span class="muted">{{ task.node }}</span>
+            </div>
           </div>
         </div>
       </div>

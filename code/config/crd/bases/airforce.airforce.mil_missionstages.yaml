@@ -68,6 +68,10 @@ spec:
                   timeout:
                     type: string
                 type: object
+              dependsOn:
+                items:
+                  type: string
+                type: array
               flightTasks:
                 items:
                   properties:
