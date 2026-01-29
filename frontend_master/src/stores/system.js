@@ -7,7 +7,7 @@ let apiTimer = null
 
 const formatTime = (date) => {
   if (!date) return '--'
-  return date.toISOString().slice(11, 16)
+  return date.toISOString().slice(11, 19)
 }
 
 const formatSeconds = (value) => `${Math.round(value / 1000)}s`
@@ -23,9 +23,9 @@ export const useSystemStore = defineStore('system', {
   getters: {
     refreshLabel: (state) => formatSeconds(state.config.refreshInterval),
     detailPollLabel: (state) => formatSeconds(state.config.detailPollInterval),
-    modeLabel: (state) => (state.config.readOnly ? 'Read-only' : 'Read-write'),
+    modeLabel: (state) => (state.config.readOnly ? '只读' : '读写'),
     authSummary: (state) => {
-      if (!state.config.authToken) return 'None'
+      if (!state.config.authToken) return '无'
       const scheme = state.config.authScheme ? `${state.config.authScheme} ` : ''
       return `${state.config.authHeader}: ${scheme}***`
     },
@@ -48,7 +48,7 @@ export const useSystemStore = defineStore('system', {
     startClock() {
       if (clockTimer) return
       this.tick()
-      clockTimer = setInterval(() => this.tick(), 60000)
+      clockTimer = setInterval(() => this.tick(), 1000)
     },
     stopClock() {
       if (!clockTimer) return
@@ -80,7 +80,7 @@ export const useSystemStore = defineStore('system', {
 
       if (result.disabled) {
         this.apiStatus = 'disabled'
-        this.apiMessage = result.error || 'API base not set'
+        this.apiMessage = result.error || 'API 地址未设置'
         return
       }
 
@@ -90,7 +90,18 @@ export const useSystemStore = defineStore('system', {
       }
 
       this.apiStatus = 'down'
-      this.apiMessage = result.error || (result.status ? `HTTP ${result.status}` : 'Unreachable')
+      this.apiMessage = result.error || (result.status ? `HTTP ${result.status}` : '无法访问')
+    },
+    updateIntervals({ refreshMs, detailMs }) {
+      if (Number.isFinite(refreshMs)) {
+        this.config.refreshInterval = refreshMs
+      }
+      if (Number.isFinite(detailMs)) {
+        this.config.detailPollInterval = detailMs
+      }
+    },
+    setReadOnly(value) {
+      this.config.readOnly = Boolean(value)
     },
   },
 })

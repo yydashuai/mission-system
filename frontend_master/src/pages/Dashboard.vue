@@ -1,30 +1,165 @@
 <script setup>
-const kpis = [
-  { label: 'Active Missions', value: '3', delta: '+1 in 1h', tone: 'ok' },
-  { label: 'Stages Running', value: '5', delta: '2 parallel', tone: 'warn' },
-  { label: 'FlightTasks', value: '18', delta: '3 waiting', tone: 'warn' },
-  { label: 'Weapons Ready', value: '42', delta: '4 online', tone: 'ok' },
-]
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useDataStore } from '../stores/data'
+import { useSystemStore } from '../stores/system'
 
-const tasks = [
-  { name: 'Recon-Phase', status: 'Running', eta: '12m', node: 'worker-2' },
-  { name: 'Jammer-Phase', status: 'Scheduled', eta: '5m', node: 'pending' },
-  { name: 'Strike-Phase', status: 'Pending', eta: '--', node: '--' },
-]
+const dataStore = useDataStore()
+const systemStore = useSystemStore()
+const { missions, stages, flightTasks, weapons } = storeToRefs(dataStore)
+
+const totalMissions = computed(() => missions.value.length)
+const activeMissions = computed(() => missions.value.filter((item) => (
+  item.status !== 'Succeeded' && item.status !== 'Failed'
+)))
+const runningStages = computed(() => stages.value.filter((item) => item.status === 'Running'))
+const waitingTasks = computed(() => flightTasks.value.filter((item) => (
+  item.status === 'Pending' || item.status === 'Scheduled'
+)))
+const readyWeapons = computed(() => weapons.value.filter((item) => item.status === 'Available'))
+
+const kpis = computed(() => ([
+  {
+    label: '活跃任务',
+    value: String(activeMissions.value.length),
+    delta: `${totalMissions.value} 个跟踪`,
+    tone: activeMissions.value.length ? 'ok' : 'muted',
+  },
+  {
+    label: '运行中阶段',
+    value: String(runningStages.value.length),
+    delta: `${stages.value.length} 个总计`,
+    tone: runningStages.value.length ? 'ok' : 'muted',
+  },
+  {
+    label: '飞行任务',
+    value: String(flightTasks.value.length),
+    delta: `${waitingTasks.value.length} 个等待`,
+    tone: waitingTasks.value.length ? 'warn' : 'ok',
+  },
+  {
+    label: '就绪武器',
+    value: String(readyWeapons.value.length),
+    delta: `${weapons.value.length} 个注册`,
+    tone: readyWeapons.value.length ? 'ok' : 'muted',
+  },
+]))
+
+const heroTags = computed(() => {
+  const apiStatus = systemStore.apiStatus
+  const apiTag = (() => {
+    if (apiStatus === 'ok') return { label: 'API 已连接', tone: 'ok' }
+    if (apiStatus === 'checking') return { label: 'API 检查中', tone: 'warn' }
+    if (apiStatus === 'down') return { label: 'API 断开', tone: 'err' }
+    if (apiStatus === 'disabled') return { label: 'API 已禁用', tone: 'muted' }
+    return { label: 'API 未知', tone: 'muted' }
+  })()
+
+  const waiting = waitingTasks.value.length
+  const tasksTag = waiting
+    ? { label: `${waiting} 个任务等待`, tone: 'warn' }
+    : { label: '无等待任务', tone: 'ok' }
+
+  return [apiTag, tasksTag]
+})
+
+const activeStage = computed(() => {
+  const list = stages.value
+  if (!list.length) return null
+  const pick = (status) => list.find((item) => item.status === status) || null
+  return pick('Running') || pick('Scheduled') || pick('Pending') || list[0]
+})
+
+const stageStatus = computed(() => String(activeStage.value?.status || '').toLowerCase())
+const stageTasks = computed(() => activeStage.value?.tasks || [])
+const activeTaskCount = computed(() => stageTasks.value.filter((item) => (
+  item.status === 'Running' || item.status === 'Scheduled'
+)).length)
+
+const timelineClass = computed(() => {
+  if (!activeStage.value) return { init: '', tasks: '', complete: '' }
+  const isSucceeded = stageStatus.value === 'succeeded'
+  const isFailed = stageStatus.value === 'failed'
+  const isRunning = stageStatus.value === 'running'
+  const isScheduled = stageStatus.value === 'scheduled'
+  const isPending = stageStatus.value === 'pending'
+
+  return {
+    init: isPending ? 'active' : 'done',
+    tasks: (isRunning || isScheduled) ? 'active' : (isSucceeded || isFailed ? 'done' : ''),
+    complete: (isSucceeded || isFailed) ? 'done' : '',
+  }
+})
+
+const stageMeta = computed(() => ({
+  mission: activeStage.value?.mission || '--',
+  mode: activeStage.value?.mode || '--',
+  name: activeStage.value?.name || '--',
+  tasksTotal: stageTasks.value.length,
+}))
+
+const stageSummary = computed(() => {
+  if (!activeStage.value) return '--'
+  if (stageStatus.value === 'succeeded') return '已完成'
+  if (stageStatus.value === 'failed') return '已失败'
+  if (stageStatus.value === 'running') return `${activeTaskCount.value} 个活跃`
+  if (stageStatus.value === 'scheduled') return '已调度'
+  if (stageStatus.value === 'pending') return '等待中'
+  return '--'
+})
+
+const parseTimeScore = (value) => {
+  if (!value || value === '--') return 0
+  const parts = String(value).split(':')
+  if (parts.length === 2) {
+    const hours = Number(parts[0])
+    const minutes = Number(parts[1])
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      return hours * 60 + minutes
+    }
+  }
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) return date.getTime()
+  return 0
+}
+
+const queueTasks = computed(() => {
+  const weight = {
+    pending: 0,
+    scheduled: 1,
+    running: 2,
+    succeeded: 3,
+    failed: 4,
+  }
+  const list = [...flightTasks.value]
+  list.sort((a, b) => {
+    const aKey = weight[String(a.status || '').toLowerCase()] ?? 9
+    const bKey = weight[String(b.status || '').toLowerCase()] ?? 9
+    if (aKey !== bKey) return aKey - bKey
+    return parseTimeScore(b.scheduledAt) - parseTimeScore(a.scheduledAt)
+  })
+  return list.slice(0, 5)
+})
 </script>
 
 <template>
   <section class="page">
     <section class="hero">
       <div>
-        <div class="hero-title">Operational Overview</div>
+        <div class="hero-title">作战概览</div>
         <div class="hero-sub">
-          Mission chain status, scheduling pressure, and deployment health.
+          任务链状态、调度压力和部署健康状况。
         </div>
       </div>
       <div class="hero-tags">
-        <span class="badge ok">All Controllers Healthy</span>
-        <span class="badge warn">2 Tasks Waiting</span>
+        <span
+          v-for="tag in heroTags"
+          :key="tag.label"
+          class="badge"
+          :class="tag.tone"
+        >
+          {{ tag.label }}
+        </span>
       </div>
     </section>
 
@@ -45,65 +180,69 @@ const tasks = [
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Active Stage Timeline</div>
-            <div class="panel-sub">SeaStrike-02 / Stage-2</div>
+            <div class="panel-title">活跃阶段时间线</div>
+            <div class="panel-sub">{{ stageMeta.mission }} / {{ stageMeta.name }}</div>
           </div>
-          <span class="badge">Parallel</span>
+          <span class="badge">{{ stageMeta.mode }}</span>
         </div>
         <div class="timeline">
-          <div class="timeline-step done">
+          <div class="timeline-step" :class="timelineClass.init">
             <span class="dot"></span>
             <div>
-              <div class="step-title">Stage Initialize</div>
-              <div class="step-meta">07:40 completed</div>
+              <div class="step-title">阶段初始化</div>
+              <div class="step-meta">{{ stageSummary }}</div>
             </div>
           </div>
-          <div class="timeline-step active">
+          <div class="timeline-step" :class="timelineClass.tasks">
             <span class="dot"></span>
             <div>
-              <div class="step-title">FlightTasks Scheduling</div>
-              <div class="step-meta">02 tasks running</div>
+              <div class="step-title">飞行任务调度</div>
+              <div class="step-meta">{{ activeTaskCount }} 个活跃 · {{ stageMeta.tasksTotal }} 个总计</div>
             </div>
           </div>
-          <div class="timeline-step">
+          <div class="timeline-step" :class="timelineClass.complete">
             <span class="dot"></span>
             <div>
-              <div class="step-title">Weapons Check</div>
-              <div class="step-meta">waiting for ft-alpha-9</div>
+              <div class="step-title">阶段完成</div>
+              <div class="step-meta">
+                {{ stageStatus === 'succeeded' || stageStatus === 'failed' ? stageStatus : '等待中' }}
+              </div>
             </div>
           </div>
+          <div v-if="!activeStage" class="empty-state">无阶段数据。</div>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">FlightTask Queue</div>
-            <div class="panel-sub">Scheduling pressure by stage</div>
+            <div class="panel-title">飞行任务队列</div>
+            <div class="panel-sub">按阶段的调度压力</div>
           </div>
-          <button class="ghost small">View All</button>
+          <button class="ghost small">查看全部</button>
         </div>
         <div class="task-table">
           <div class="task-row task-head">
-            <div class="cell-start">Name</div>
-            <div class="cell-center">Status</div>
-            <div class="cell-center">ETA</div>
-            <div class="cell-center">Node</div>
+            <div class="cell-start">名称</div>
+            <div class="cell-center">状态</div>
+            <div class="cell-center">预计时间</div>
+            <div class="cell-center">节点</div>
           </div>
-          <div v-for="task in tasks" :key="task.name" class="task-row">
+          <div v-for="task in queueTasks" :key="task.name" class="task-row">
             <div class="cell-start">
               <span class="task-name">{{ task.name }}</span>
             </div>
             <div class="cell-center">
-              <span class="badge" :class="task.status.toLowerCase()">{{ task.status }}</span>
+              <span class="badge" :class="String(task.status).toLowerCase()">{{ task.status }}</span>
             </div>
             <div class="cell-center">
-              <span>{{ task.eta }}</span>
+              <span>{{ task.scheduledAt || '--' }}</span>
             </div>
             <div class="cell-center">
-              <span class="muted">{{ task.node }}</span>
+              <span class="muted">{{ task.node || '--' }}</span>
             </div>
           </div>
+          <div v-if="!queueTasks.length" class="empty-state">无飞行任务。</div>
         </div>
       </div>
     </section>

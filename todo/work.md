@@ -247,3 +247,17 @@
 #### 前端刷新体验优化
 - ✅ 轮询刷新时保留旧数据，仅在首次加载显示 Loading，减少列表闪烁
 - ✅ API 状态轮询改为静默更新，避免 Sidebar 在检查时闪烁
+
+#### 前端首页优化
+- ✅ Dashboard 改为基于实时数据渲染（KPI/Stage/FlightTask Queue）
+
+#### 前端设置项完善
+- ✅ Settings 支持手动修改 Refresh Interval 与 Detail Polling（Read-only 关闭时生效）
+- ✅ Settings Read-only 改为可切换开关
+- ✅ Last Checked 显示精确到秒
+- ✅ TopBar 时间改为每秒更新
+
+### 2026-01-27
+
+#### 前端 Focus 同步策略
+- ✅ 保留页面自动选中详情，但右侧 Focus 仅在用户点击列表项时更新，避免自动同步造成重复

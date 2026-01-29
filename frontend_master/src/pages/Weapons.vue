@@ -27,12 +27,12 @@ const emptyWeapon = {
 }
 
 const statusOptions = [
-  { value: 'all', label: 'All' },
-  { value: 'Available', label: 'Available' },
-  { value: 'Updating', label: 'Updating' },
-  { value: 'Degraded', label: 'Degraded' },
-  { value: 'Deprecated', label: 'Deprecated' },
-  { value: 'Retired', label: 'Retired' },
+  { value: 'all', label: '全部' },
+  { value: 'Available', label: '可用' },
+  { value: 'Updating', label: '更新中' },
+  { value: 'Degraded', label: '降级' },
+  { value: 'Deprecated', label: '已弃用' },
+  { value: 'Retired', label: '已退役' },
 ]
 
 const statusScore = (value) => {
@@ -125,11 +125,10 @@ watch(filteredWeapons, (list) => {
   }
 }, { immediate: true })
 
-watch(selected, (value) => {
-  if (value) {
-    focusStore.setFocus('weapon', value)
-  }
-}, { immediate: true })
+const selectWeapon = (weapon) => {
+  selectedKey.value = weapon.name
+  focusStore.setFocus('weapon', weapon)
+}
 
 const statusTone = (status) => {
   if (status === 'Available') return 'ok'
@@ -143,12 +142,12 @@ const statusTone = (status) => {
   <section class="page">
     <header class="page-header">
       <div>
-        <div class="page-title">Weapons</div>
-        <div class="page-sub">Compatibility, container spec, and usage.</div>
+        <div class="page-title">武器系统</div>
+        <div class="page-sub">兼容性、容器规格与使用情况</div>
       </div>
       <div class="page-actions">
-        <button class="ghost small">Pull Image</button>
-        <button class="ghost small">Compatibility Matrix</button>
+        <button class="ghost small">拉取镜像</button>
+        <button class="ghost small">兼容性矩阵</button>
       </div>
     </header>
 
@@ -156,11 +155,11 @@ const statusTone = (status) => {
       <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Weapon Registry</div>
-          <div class="panel-sub">Sidecar packages available to FlightTasks.</div>
+          <div class="panel-title">武器库</div>
+          <div class="panel-sub">可用于飞行任务的边车容器包</div>
         </div>
-        <span v-if="isLoading" class="badge warn">Loading</span>
-        <span v-else class="badge">{{ filteredWeapons.length }} / {{ weapons.length }} packages</span>
+        <span v-if="isLoading" class="badge warn">加载中</span>
+        <span v-else class="badge">{{ filteredWeapons.length }} / {{ weapons.length }} 个包</span>
       </div>
       <div class="panel-toolbar">
         <div class="filter-row">
@@ -168,7 +167,7 @@ const statusTone = (status) => {
             v-model="query"
             class="input"
             type="search"
-            placeholder="Search weapon, image, resources"
+            placeholder="搜索武器、镜像、资源"
           />
           <div class="segmented">
             <button
@@ -186,26 +185,26 @@ const statusTone = (status) => {
         </div>
         <div class="filter-row">
           <div class="filter-group">
-            <span class="filter-label">Sort</span>
+            <span class="filter-label">排序</span>
             <select v-model="sortKey" class="select">
-              <option value="name">Name</option>
-              <option value="status">Status</option>
-              <option value="usage">Usage</option>
-              <option value="version">Version</option>
+              <option value="name">名称</option>
+              <option value="status">状态</option>
+              <option value="usage">使用量</option>
+              <option value="version">版本</option>
             </select>
             <button type="button" class="ghost small" @click="toggleSort">
-              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+              {{ sortDir === 'asc' ? '升序' : '降序' }}
             </button>
           </div>
         </div>
       </div>
       <div class="data-table">
         <div class="data-row is-head" style="--cols: 1.1fr 0.8fr 0.9fr 0.7fr 0.7fr">
-          <span>Weapon</span>
-          <span>Status</span>
-            <span>Image</span>
-            <span>Version</span>
-            <span>Usage</span>
+          <span>武器</span>
+          <span>状态</span>
+            <span>镜像</span>
+            <span>版本</span>
+            <span>使用量</span>
           </div>
           <button
             v-for="weapon in filteredWeapons"
@@ -214,7 +213,7 @@ const statusTone = (status) => {
             :class="{ active: selectedKey === weapon.name }"
             style="--cols: 1.1fr 0.8fr 0.9fr 0.7fr 0.7fr"
             type="button"
-            @click="selectedKey = weapon.name"
+            @click="selectWeapon(weapon)"
           >
             <div class="cell-main">
               <div class="cell-title">{{ weapon.name }}</div>
@@ -226,7 +225,7 @@ const statusTone = (status) => {
             <span class="badge muted">{{ weapon.usage }}</span>
           </button>
           <div v-if="!filteredWeapons.length && !isLoading" class="empty-state">
-            No weapons match the current filters.
+            没有符合当前筛选条件的武器
           </div>
         </div>
       </div>
@@ -234,7 +233,7 @@ const statusTone = (status) => {
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Weapon Detail</div>
+            <div class="panel-title">武器详情</div>
             <div class="panel-sub">{{ selectedSafe.image }}</div>
           </div>
           <span class="badge" :class="statusTone(selectedSafe.status)">{{ selectedSafe.status }}</span>
@@ -243,16 +242,16 @@ const statusTone = (status) => {
         <div class="detail-card">
           <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
-            <span class="badge muted">Version {{ selectedSafe.version }}</span>
+            <span class="badge muted">版本 {{ selectedSafe.version }}</span>
             <span class="badge">{{ selectedSafe.usage }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
-              <span>Resources</span>
+              <span>资源</span>
               <span>{{ selectedSafe.resources }}</span>
             </div>
             <div class="kv">
-              <span>Image</span>
+              <span>镜像</span>
               <span>{{ selectedSafe.image }}</span>
             </div>
           </div>
@@ -261,17 +260,17 @@ const statusTone = (status) => {
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Compatibility</div>
-              <div class="panel-sub">Verified aircraft and hardpoints.</div>
+              <div class="panel-title">兼容性</div>
+              <div class="panel-sub">已验证的机型与挂载点</div>
             </div>
           </div>
           <div class="chip-row">
             <span v-for="item in selectedSafe.aircraft" :key="item" class="chip">{{ item }}</span>
-            <div v-if="!selectedSafe.aircraft.length" class="empty-state">No aircraft listed.</div>
+            <div v-if="!selectedSafe.aircraft.length" class="empty-state">无机型列表</div>
           </div>
           <div class="chip-row">
             <span v-for="item in selectedSafe.hardpoints" :key="item" class="chip">{{ item }}</span>
-            <div v-if="!selectedSafe.hardpoints.length" class="empty-state">No hardpoints listed.</div>
+            <div v-if="!selectedSafe.hardpoints.length" class="empty-state">无挂载点列表</div>
           </div>
         </div>
       </div>

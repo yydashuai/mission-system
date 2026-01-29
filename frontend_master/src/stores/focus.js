@@ -15,10 +15,10 @@ export const useFocusStore = defineStore('focus', {
       podStatus: 'Pending',
     },
     events: [
-      { time: '08:21', label: 'FT-ghost-12 pending: node affinity unmet', tone: 'warn' },
-      { time: '08:18', label: 'Weapon PL-15 injected into ft-rapid-3', tone: 'ok' },
-      { time: '08:07', label: 'Mission SeaStrike-02 stage-2 running', tone: 'ok' },
-      { time: '07:55', label: 'ImagePullBackOff on ft-alpha-9', tone: 'err' },
+      { time: '08:21', label: 'FT-ghost-12 待调度: 节点亲和性不满足', tone: 'warn' },
+      { time: '08:18', label: '武器 PL-15 已注入 ft-rapid-3', tone: 'ok' },
+      { time: '08:07', label: '任务 SeaStrike-02 阶段-2 运行中', tone: 'ok' },
+      { time: '07:55', label: 'ft-alpha-9 镜像拉取失败', tone: 'err' },
     ],
   }),
   actions: {

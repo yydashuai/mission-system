@@ -34,12 +34,12 @@ const emptyTask = {
 }
 
 const statusOptions = [
-  { value: 'all', label: 'All' },
-  { value: 'Running', label: 'Running' },
-  { value: 'Scheduled', label: 'Scheduled' },
-  { value: 'Pending', label: 'Pending' },
-  { value: 'Succeeded', label: 'Succeeded' },
-  { value: 'Failed', label: 'Failed' },
+  { value: 'all', label: '全部' },
+  { value: 'Running', label: '执行中' },
+  { value: 'Scheduled', label: '已调度' },
+  { value: 'Pending', label: '待调度' },
+  { value: 'Succeeded', label: '已完成' },
+  { value: 'Failed', label: '失败' },
 ]
 
 const statusScore = (value) => {
@@ -167,23 +167,22 @@ watch(filteredTasks, (list) => {
   }
 }, { immediate: true })
 
-watch(selected, (value) => {
-  if (value) {
-    focusStore.setFocus('flighttask', value)
-  }
-}, { immediate: true })
+const selectTask = (task) => {
+  selectedKey.value = task.name
+  focusStore.setFocus('flighttask', task)
+}
 </script>
 
 <template>
   <section class="page">
     <header class="page-header">
       <div>
-        <div class="page-title">FlightTasks</div>
-        <div class="page-sub">Scheduling detail, pod binding, and status.</div>
+        <div class="page-title">飞行任务</div>
+        <div class="page-sub">调度详情、Pod 绑定及状态信息</div>
       </div>
       <div class="page-actions">
-        <button class="ghost small">Copy YAML</button>
-        <button class="ghost small">Inspect Pod</button>
+        <button class="ghost small">复制 YAML</button>
+        <button class="ghost small">检查 Pod</button>
       </div>
     </header>
 
@@ -191,11 +190,11 @@ watch(selected, (value) => {
       <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Task Queue</div>
-          <div class="panel-sub">Select a task for scheduling context.</div>
+          <div class="panel-title">任务队列</div>
+          <div class="panel-sub">选择任务查看调度上下文</div>
         </div>
-        <span v-if="isLoading" class="badge warn">Loading</span>
-        <span v-else class="badge">{{ filteredTasks.length }} / {{ flightTasks.length }} tasks</span>
+        <span v-if="isLoading" class="badge warn">加载中</span>
+        <span v-else class="badge">{{ filteredTasks.length }} / {{ flightTasks.length }} 个任务</span>
       </div>
       <div class="panel-toolbar">
         <div class="filter-row">
@@ -203,7 +202,7 @@ watch(selected, (value) => {
             v-model="query"
             class="input"
             type="search"
-            placeholder="Search task, mission, weapon, node"
+            placeholder="搜索任务、任务组、武器、节点"
           />
           <div class="segmented">
             <button
@@ -221,43 +220,43 @@ watch(selected, (value) => {
         </div>
         <div class="filter-row">
           <div class="filter-group">
-            <span class="filter-label">Mission</span>
+            <span class="filter-label">任务组</span>
             <select v-model="missionFilter" class="select">
               <option v-for="mission in missionOptions" :key="mission" :value="mission">
-                {{ mission === 'all' ? 'All missions' : mission }}
+                {{ mission === 'all' ? '全部任务组' : mission }}
               </option>
             </select>
           </div>
           <div class="filter-group">
-            <span class="filter-label">Stage</span>
+            <span class="filter-label">阶段</span>
             <select v-model="stageFilter" class="select">
               <option v-for="stage in stageOptions" :key="stage" :value="stage">
-                {{ stage === 'all' ? 'All stages' : stage }}
+                {{ stage === 'all' ? '全部阶段' : stage }}
               </option>
             </select>
           </div>
           <div class="filter-group">
-            <span class="filter-label">Sort</span>
+            <span class="filter-label">排序</span>
             <select v-model="sortKey" class="select">
-              <option value="scheduledAt">Scheduled</option>
-              <option value="name">Name</option>
-              <option value="status">Status</option>
-              <option value="attempts">Attempts</option>
-              <option value="node">Node</option>
+              <option value="scheduledAt">调度时间</option>
+              <option value="name">名称</option>
+              <option value="status">状态</option>
+              <option value="attempts">尝试次数</option>
+              <option value="node">节点</option>
             </select>
             <button type="button" class="ghost small" @click="toggleSort">
-              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+              {{ sortDir === 'asc' ? '升序' : '降序' }}
             </button>
           </div>
         </div>
       </div>
       <div class="data-table">
         <div class="data-row is-head" style="--cols: 1.2fr 0.8fr 0.7fr 0.7fr 0.6fr">
-          <span>Task</span>
-          <span>Stage</span>
-            <span>Status</span>
-            <span>Node</span>
-            <span>Weapon</span>
+          <span>任务</span>
+          <span>阶段</span>
+            <span>状态</span>
+            <span>节点</span>
+            <span>武器</span>
           </div>
           <button
             v-for="task in filteredTasks"
@@ -266,7 +265,7 @@ watch(selected, (value) => {
             :class="{ active: selectedKey === task.name }"
             style="--cols: 1.2fr 0.8fr 0.7fr 0.7fr 0.6fr"
             type="button"
-            @click="selectedKey = task.name"
+            @click="selectTask(task)"
           >
             <div class="cell-main">
               <div class="cell-title">{{ task.name }}</div>
@@ -278,7 +277,7 @@ watch(selected, (value) => {
             <span class="badge muted">{{ task.weapon }}</span>
           </button>
           <div v-if="!filteredTasks.length && !isLoading" class="empty-state">
-            No tasks match the current filters.
+            没有符合当前筛选条件的任务
           </div>
         </div>
       </div>
@@ -286,7 +285,7 @@ watch(selected, (value) => {
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Task Detail</div>
+            <div class="panel-title">任务详情</div>
             <div class="panel-sub">{{ selectedSafe.mission }} / {{ selectedSafe.stage }}</div>
           </div>
           <span class="badge" :class="String(selectedSafe.status).toLowerCase()">{{ selectedSafe.status }}</span>
@@ -296,23 +295,23 @@ watch(selected, (value) => {
           <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
             <span class="badge muted">Pod {{ selectedSafe.pod }}</span>
-            <span class="badge">Node {{ selectedSafe.node }}</span>
+            <span class="badge">节点 {{ selectedSafe.node }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
-              <span>Scheduled At</span>
+              <span>调度时间</span>
               <span>{{ selectedSafe.scheduledAt }}</span>
             </div>
             <div class="kv">
-              <span>Scheduling Attempts</span>
+              <span>调度尝试次数</span>
               <span>{{ selectedSafe.attempts }}</span>
             </div>
             <div class="kv">
-              <span>Pod Status</span>
+              <span>Pod 状态</span>
               <span>{{ selectedSafe.podStatus }}</span>
             </div>
             <div class="kv">
-              <span>Sidecars</span>
+              <span>边车容器</span>
               <span>{{ selectedSafe.sidecars.join(', ') }}</span>
             </div>
           </div>
@@ -321,21 +320,21 @@ watch(selected, (value) => {
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Scheduling Constraints</div>
-              <div class="panel-sub">Required node affinity and aircraft filters.</div>
+              <div class="panel-title">调度约束</div>
+              <div class="panel-sub">节点亲和性及机型过滤要求</div>
             </div>
           </div>
           <div class="chip-row">
             <span v-for="item in selectedSafe.constraints" :key="item" class="chip">{{ item }}</span>
-            <div v-if="!selectedSafe.constraints.length" class="empty-state">No constraints data.</div>
+            <div v-if="!selectedSafe.constraints.length" class="empty-state">无约束数据</div>
           </div>
         </div>
 
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Conditions</div>
-              <div class="panel-sub">Live pod + scheduler signals.</div>
+              <div class="panel-title">状态条件</div>
+              <div class="panel-sub">Pod 及调度器实时信号</div>
             </div>
           </div>
           <div class="condition-list">
@@ -343,7 +342,7 @@ watch(selected, (value) => {
               <span class="badge" :class="item.tone">{{ item.label }}</span>
               <span class="condition-detail">{{ item.detail }}</span>
             </div>
-            <div v-if="!selectedSafe.conditions.length" class="empty-state">No condition updates.</div>
+            <div v-if="!selectedSafe.conditions.length" class="empty-state">无状态更新</div>
           </div>
         </div>
       </div>

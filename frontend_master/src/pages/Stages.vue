@@ -31,12 +31,12 @@ const emptyStage = {
 const buildKey = (item) => `${item.mission}::${item.name}`
 
 const statusOptions = [
-  { value: 'all', label: 'All' },
-  { value: 'Running', label: 'Running' },
-  { value: 'Scheduled', label: 'Scheduled' },
-  { value: 'Pending', label: 'Pending' },
-  { value: 'Succeeded', label: 'Succeeded' },
-  { value: 'Failed', label: 'Failed' },
+  { value: 'all', label: '全部' },
+  { value: 'Running', label: '运行中' },
+  { value: 'Scheduled', label: '已调度' },
+  { value: 'Pending', label: '待执行' },
+  { value: 'Succeeded', label: '已完成' },
+  { value: 'Failed', label: '失败' },
 ]
 
 const statusScore = (value) => {
@@ -138,9 +138,9 @@ const selected = computed(() => (
 const selectedSafe = computed(() => selected.value || emptyStage)
 
 const stageSubLabel = (stage) => {
-  const parts = [`Timeout ${stage.timeout}`]
+  const parts = [`超时 ${stage.timeout}`]
   if (stage.dependsOn && stage.dependsOn.length) {
-    parts.push(`Depends ${stage.dependsOn.join(', ')}`)
+    parts.push(`依赖 ${stage.dependsOn.join(', ')}`)
   }
   return parts.join(' · ')
 }
@@ -160,23 +160,22 @@ watch(filteredStages, (list) => {
   }
 }, { immediate: true })
 
-watch(selected, (value) => {
-  if (value) {
-    focusStore.setFocus('stage', value)
-  }
-}, { immediate: true })
+const selectStage = (stage) => {
+  selectedKey.value = buildKey(stage)
+  focusStore.setFocus('stage', stage)
+}
 </script>
 
 <template>
   <section class="page">
     <header class="page-header">
       <div>
-        <div class="page-title">Mission Stages</div>
-        <div class="page-sub">Stage execution flow and dependencies.</div>
+        <div class="page-title">任务阶段</div>
+        <div class="page-sub">阶段执行流程与依赖关系。</div>
       </div>
       <div class="page-actions">
-        <button class="ghost small">View Gantt</button>
-        <button class="ghost small">Export YAML</button>
+        <button class="ghost small">查看甘特图</button>
+        <button class="ghost small">导出 YAML</button>
       </div>
     </header>
 
@@ -184,11 +183,11 @@ watch(selected, (value) => {
       <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Stages</div>
-          <div class="panel-sub">Sorted by mission and sequence.</div>
+          <div class="panel-title">阶段列表</div>
+          <div class="panel-sub">按任务和序列排序。</div>
         </div>
-        <span v-if="isLoading" class="badge warn">Loading</span>
-        <span v-else class="badge">{{ filteredStages.length }} / {{ stages.length }} stages</span>
+        <span v-if="isLoading" class="badge warn">加载中</span>
+        <span v-else class="badge">{{ filteredStages.length }} / {{ stages.length }} 个阶段</span>
       </div>
       <div class="panel-toolbar">
         <div class="filter-row">
@@ -196,7 +195,7 @@ watch(selected, (value) => {
             v-model="query"
             class="input"
             type="search"
-            placeholder="Search stage or mission"
+            placeholder="搜索阶段或任务"
           />
           <div class="segmented">
             <button
@@ -214,43 +213,43 @@ watch(selected, (value) => {
         </div>
         <div class="filter-row">
           <div class="filter-group">
-            <span class="filter-label">Mission</span>
+            <span class="filter-label">任务</span>
             <select v-model="missionFilter" class="select">
               <option v-for="mission in missionOptions" :key="mission" :value="mission">
-                {{ mission === 'all' ? 'All missions' : mission }}
+                {{ mission === 'all' ? '全部任务' : mission }}
               </option>
             </select>
           </div>
           <div class="filter-group">
-            <span class="filter-label">Mode</span>
+            <span class="filter-label">模式</span>
             <select v-model="modeFilter" class="select">
               <option v-for="mode in modeOptions" :key="mode" :value="mode">
-                {{ mode === 'all' ? 'All modes' : mode }}
+                {{ mode === 'all' ? '全部模式' : mode }}
               </option>
             </select>
           </div>
           <div class="filter-group">
-            <span class="filter-label">Sort</span>
+            <span class="filter-label">排序</span>
             <select v-model="sortKey" class="select">
-              <option value="index">Index</option>
-              <option value="name">Name</option>
-              <option value="mission">Mission</option>
-              <option value="status">Status</option>
-              <option value="mode">Mode</option>
+              <option value="index">序号</option>
+              <option value="name">名称</option>
+              <option value="mission">任务</option>
+              <option value="status">状态</option>
+              <option value="mode">模式</option>
             </select>
             <button type="button" class="ghost small" @click="toggleSort">
-              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+              {{ sortDir === 'asc' ? '升序' : '降序' }}
             </button>
           </div>
         </div>
       </div>
       <div class="data-table">
         <div class="data-row is-head" style="--cols: 1.2fr 0.9fr 0.7fr 0.7fr 0.6fr">
-          <span>Stage</span>
-          <span>Mission</span>
-            <span>Status</span>
-            <span>Mode</span>
-            <span>Index</span>
+          <span>阶段</span>
+          <span>任务</span>
+            <span>状态</span>
+            <span>模式</span>
+            <span>序号</span>
           </div>
           <button
             v-for="stage in filteredStages"
@@ -259,7 +258,7 @@ watch(selected, (value) => {
             :class="{ active: selectedKey === buildKey(stage) }"
             style="--cols: 1.2fr 0.9fr 0.7fr 0.7fr 0.6fr"
             type="button"
-            @click="selectedKey = buildKey(stage)"
+            @click="selectStage(stage)"
           >
             <div class="cell-main">
               <div class="cell-title">{{ stage.name }}</div>
@@ -271,7 +270,7 @@ watch(selected, (value) => {
             <span class="muted">{{ stage.index }}</span>
           </button>
           <div v-if="!filteredStages.length && !isLoading" class="empty-state">
-            No stages match the current filters.
+            没有符合当前筛选条件的阶段。
           </div>
         </div>
       </div>
@@ -279,7 +278,7 @@ watch(selected, (value) => {
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Stage Detail</div>
+            <div class="panel-title">阶段详情</div>
             <div class="panel-sub">{{ selectedSafe.mission }}</div>
           </div>
           <span class="badge" :class="String(selectedSafe.status).toLowerCase()">{{ selectedSafe.status }}</span>
@@ -289,19 +288,19 @@ watch(selected, (value) => {
           <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
             <span class="badge muted">{{ selectedSafe.mode }}</span>
-            <span class="badge">Timeout {{ selectedSafe.timeout }}</span>
+            <span class="badge">超时 {{ selectedSafe.timeout }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
-              <span>Sequence</span>
-              <span>Stage {{ selectedSafe.index }}</span>
+              <span>序列</span>
+              <span>阶段 {{ selectedSafe.index }}</span>
             </div>
             <div class="kv">
-              <span>Depends On</span>
-              <span>{{ selectedSafe.dependsOn.length ? selectedSafe.dependsOn.join(', ') : 'None' }}</span>
+              <span>依赖项</span>
+              <span>{{ selectedSafe.dependsOn.length ? selectedSafe.dependsOn.join(', ') : '无' }}</span>
             </div>
             <div class="kv">
-              <span>FlightTasks</span>
+              <span>飞行任务</span>
               <span>{{ selectedSafe.tasks.length }}</span>
             </div>
           </div>
@@ -310,30 +309,30 @@ watch(selected, (value) => {
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Dependencies</div>
-              <div class="panel-sub">Upstream stages gating execution.</div>
+              <div class="panel-title">依赖关系</div>
+              <div class="panel-sub">上游阶段执行门控。</div>
             </div>
           </div>
           <div class="chip-row">
             <span v-for="item in selectedSafe.dependsOn" :key="item" class="chip">{{ item }}</span>
-            <div v-if="!selectedSafe.dependsOn.length" class="empty-state">No dependencies.</div>
+            <div v-if="!selectedSafe.dependsOn.length" class="empty-state">无依赖项。</div>
           </div>
         </div>
 
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">FlightTasks</div>
-              <div class="panel-sub">Execution order and current node.</div>
+              <div class="panel-title">飞行任务</div>
+              <div class="panel-sub">执行顺序与当前节点。</div>
             </div>
-            <span class="badge">{{ selectedSafe.tasks.length }} tasks</span>
+            <span class="badge">{{ selectedSafe.tasks.length }} 个任务</span>
           </div>
           <div class="task-table">
           <div class="task-row task-head">
-            <div class="cell-start">Name</div>
-            <div class="cell-center">Status</div>
-            <div class="cell-center">ETA</div>
-            <div class="cell-center">Node</div>
+            <div class="cell-start">名称</div>
+            <div class="cell-center">状态</div>
+            <div class="cell-center">预计时间</div>
+            <div class="cell-center">节点</div>
           </div>
           <div v-for="task in selectedSafe.tasks" :key="task.name" class="task-row">
             <div class="cell-start">
@@ -349,7 +348,7 @@ watch(selected, (value) => {
               <span class="muted">{{ task.node }}</span>
             </div>
           </div>
-            <div v-if="!selectedSafe.tasks.length" class="empty-state">No tasks available.</div>
+            <div v-if="!selectedSafe.tasks.length" class="empty-state">暂无可用任务。</div>
           </div>
         </div>
       </div>

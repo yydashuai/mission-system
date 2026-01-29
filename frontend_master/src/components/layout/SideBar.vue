@@ -22,36 +22,36 @@ const controlNode = computed(() => (
 ))
 
 const nodesValue = computed(() => {
-  if (!apiOk.value) return 'Loading'
+  if (!apiOk.value) return '加载中'
   if (!totalNodes.value) return '--'
   return `${readyNodes.value} / ${totalNodes.value}`
 })
 
 const nodesMeta = computed(() => {
-  if (!apiOk.value) return 'Control Plane: --'
-  if (!controlNode.value) return 'Control Plane: --'
-  return `Control Plane: ${controlNode.value.status}`
+  if (!apiOk.value) return '控制平面: --'
+  if (!controlNode.value) return '控制平面: --'
+  return `控制平面: ${controlNode.value.status}`
 })
 
 const eventCount = computed(() => events.value.length)
 const warnCount = computed(() => events.value.filter((item) => item.level === 'warn' || item.level === 'err').length)
 
 const eventsValue = computed(() => {
-  if (!apiOk.value) return 'Loading'
+  if (!apiOk.value) return '加载中'
   if (!eventCount.value) return '--'
   return String(eventCount.value)
 })
 
 const eventsMeta = computed(() => {
-  if (!apiOk.value) return 'Loading'
-  if (!eventCount.value) return 'No events'
-  return warnCount.value ? `${warnCount.value} warnings` : 'No warnings'
+  if (!apiOk.value) return '加载中'
+  if (!eventCount.value) return '无事件'
+  return warnCount.value ? `${warnCount.value} 条警告` : '无警告'
 })
 </script>
 
 <template>
   <aside class="sidebar">
-    <div class="section-title">Navigation</div>
+    <div class="section-title">导航</div>
     <nav class="nav-list">
       <router-link
         v-for="item in uiStore.navItems"
@@ -65,15 +65,15 @@ const eventsMeta = computed(() => {
       </router-link>
     </nav>
 
-    <div class="section-title">System Health</div>
+    <div class="section-title">系统健康</div>
     <div class="health-grid">
       <div class="health-card">
-        <div class="health-title">Nodes Ready</div>
+        <div class="health-title">节点就绪</div>
         <div class="health-value">{{ nodesValue }}</div>
         <div class="health-meta">{{ nodesMeta }}</div>
       </div>
       <div class="health-card">
-        <div class="health-title">Events (24h)</div>
+        <div class="health-title">事件 (24h)</div>
         <div class="health-value">{{ eventsValue }}</div>
         <div class="health-meta">{{ eventsMeta }}</div>
       </div>

@@ -17,8 +17,7 @@ defineProps({
       <div class="panel-title">{{ title }}</div>
       <div class="panel-sub">{{ subtitle }}</div>
       <div class="placeholder-body">
-        Live data wiring pending. This page will render Kubernetes resources once the
-        API is connected.
+        实时数据连接待建立。API 连接后，此页面将显示 Kubernetes 资源。
       </div>
     </div>
   </section>

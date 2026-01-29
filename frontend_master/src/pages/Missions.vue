@@ -30,12 +30,12 @@ const emptyMission = {
 }
 
 const statusOptions = [
-  { value: 'all', label: 'All' },
-  { value: 'Running', label: 'Running' },
-  { value: 'Scheduled', label: 'Scheduled' },
-  { value: 'Pending', label: 'Pending' },
-  { value: 'Succeeded', label: 'Succeeded' },
-  { value: 'Failed', label: 'Failed' },
+  { value: 'all', label: '全部' },
+  { value: 'Running', label: '执行中' },
+  { value: 'Scheduled', label: '已调度' },
+  { value: 'Pending', label: '待执行' },
+  { value: 'Succeeded', label: '已完成' },
+  { value: 'Failed', label: '已失败' },
 ]
 
 const priorityScore = (value) => {
@@ -155,11 +155,10 @@ watch(filteredMissions, (list) => {
   }
 }, { immediate: true })
 
-watch(selected, (value) => {
-  if (value) {
-    focusStore.setFocus('mission', value)
-  }
-}, { immediate: true })
+const selectMission = (mission) => {
+  selectedKey.value = mission.name
+  focusStore.setFocus('mission', mission)
+}
 
 const priorityTone = (priority) => {
   const key = String(priority || '').toLowerCase()
@@ -173,12 +172,12 @@ const priorityTone = (priority) => {
   <section class="page">
     <header class="page-header">
       <div>
-        <div class="page-title">Missions</div>
-        <div class="page-sub">Mission list, lifecycle, and stage composition.</div>
+        <div class="page-title">任务管理</div>
+        <div class="page-sub">任务列表、生命周期与阶段组成</div>
       </div>
       <div class="page-actions">
-        <button class="ghost small">Export JSON</button>
-        <button class="primary">Launch Demo</button>
+        <button class="ghost small">导出 JSON</button>
+        <button class="primary">启动演示</button>
       </div>
     </header>
 
@@ -186,11 +185,11 @@ const priorityTone = (priority) => {
       <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Active Missions</div>
-          <div class="panel-sub">Select a mission to inspect stage flow.</div>
+          <div class="panel-title">活跃任务</div>
+          <div class="panel-sub">选择任务以查看阶段流程</div>
         </div>
-        <span v-if="isLoading" class="badge warn">Loading</span>
-        <span v-else class="badge">{{ filteredMissions.length }} / {{ missions.length }} tracked</span>
+        <span v-if="isLoading" class="badge warn">加载中</span>
+        <span v-else class="badge">{{ filteredMissions.length }} / {{ missions.length }} 已跟踪</span>
       </div>
 
       <div class="panel-toolbar">
@@ -199,7 +198,7 @@ const priorityTone = (priority) => {
             v-model="query"
             class="input"
             type="search"
-            placeholder="Search mission, commander, region"
+            placeholder="搜索任务、指挥官、区域"
           />
           <div class="segmented">
             <button
@@ -217,17 +216,17 @@ const priorityTone = (priority) => {
         </div>
         <div class="filter-row">
           <div class="filter-group">
-            <span class="filter-label">Sort</span>
+            <span class="filter-label">排序</span>
             <select v-model="sortKey" class="select">
-              <option value="updated">Updated</option>
-              <option value="name">Name</option>
-              <option value="priority">Priority</option>
-              <option value="status">Status</option>
-              <option value="tasks">FlightTasks</option>
-              <option value="stages">Stages</option>
+              <option value="updated">更新时间</option>
+              <option value="name">名称</option>
+              <option value="priority">优先级</option>
+              <option value="status">状态</option>
+              <option value="tasks">飞行任务</option>
+              <option value="stages">阶段</option>
             </select>
             <button type="button" class="ghost small" @click="toggleSort">
-              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+              {{ sortDir === 'asc' ? '升序' : '降序' }}
             </button>
           </div>
         </div>
@@ -235,11 +234,11 @@ const priorityTone = (priority) => {
 
       <div class="data-table">
         <div class="data-row is-head" style="--cols: 1.3fr 0.7fr 0.7fr 0.6fr 0.7fr">
-          <span>Mission</span>
-          <span>Status</span>
-            <span>Priority</span>
-            <span>Stages</span>
-            <span>Updated</span>
+          <span>任务</span>
+          <span>状态</span>
+            <span>优先级</span>
+            <span>阶段</span>
+            <span>更新时间</span>
           </div>
           <button
             v-for="mission in filteredMissions"
@@ -248,7 +247,7 @@ const priorityTone = (priority) => {
             :class="{ active: selectedKey === mission.name }"
             style="--cols: 1.3fr 0.7fr 0.7fr 0.6fr 0.7fr"
             type="button"
-            @click="selectedKey = mission.name"
+            @click="selectMission(mission)"
           >
             <div class="cell-main">
               <div class="cell-title">{{ mission.name }}</div>
@@ -260,7 +259,7 @@ const priorityTone = (priority) => {
             <span class="muted">{{ mission.updated }}</span>
           </button>
           <div v-if="!filteredMissions.length && !isLoading" class="empty-state">
-            No missions match the current filters.
+            没有符合当前筛选条件的任务。
           </div>
         </div>
       </div>
@@ -268,7 +267,7 @@ const priorityTone = (priority) => {
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Mission Detail</div>
+            <div class="panel-title">任务详情</div>
             <div class="panel-sub">{{ selectedSafe.region }}</div>
           </div>
           <span class="badge" :class="String(selectedSafe.status).toLowerCase()">{{ selectedSafe.status }}</span>
@@ -277,25 +276,25 @@ const priorityTone = (priority) => {
         <div class="detail-card">
           <div class="detail-title">{{ selectedSafe.name }}</div>
           <div class="detail-meta">
-            <span class="badge" :class="priorityTone(selectedSafe.priority)">{{ selectedSafe.priority }} Priority</span>
+            <span class="badge" :class="priorityTone(selectedSafe.priority)">{{ selectedSafe.priority }} 优先级</span>
             <span class="badge muted">{{ selectedSafe.type }}</span>
-            <span class="badge">Failure: {{ selectedSafe.failurePolicy }}</span>
+            <span class="badge">失败策略: {{ selectedSafe.failurePolicy }}</span>
           </div>
           <div class="detail-info">
             <div class="kv">
-              <span>Commander</span>
+              <span>指挥官</span>
               <span>{{ selectedSafe.commander }}</span>
             </div>
             <div class="kv">
-              <span>Region</span>
+              <span>区域</span>
               <span>{{ selectedSafe.region }}</span>
             </div>
             <div class="kv">
-              <span>FlightTasks</span>
+              <span>飞行任务</span>
               <span>{{ selectedSafe.tasks }}</span>
             </div>
             <div class="kv">
-              <span>Objective</span>
+              <span>目标</span>
               <span>{{ selectedSafe.objective }}</span>
             </div>
           </div>
@@ -304,10 +303,10 @@ const priorityTone = (priority) => {
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Stage Flow</div>
-              <div class="panel-sub">Parallel and sequential segments.</div>
+              <div class="panel-title">阶段流程</div>
+              <div class="panel-sub">并行与串行执行段</div>
             </div>
-            <span class="badge">{{ selectedSafe.stages.length }} stages</span>
+            <span class="badge">{{ selectedSafe.stages.length }} 个阶段</span>
           </div>
           <div class="flow-line">
           <div
@@ -317,13 +316,13 @@ const priorityTone = (priority) => {
             :class="stage.status.toLowerCase()"
           >
             <div class="flow-title">{{ stage.name }}</div>
-            <div class="flow-meta">{{ stage.mode }} · {{ stage.tasks }} tasks</div>
+            <div class="flow-meta">{{ stage.mode }} · {{ stage.tasks }} 个任务</div>
             <div v-if="stage.dependsOn && stage.dependsOn.length" class="flow-deps">
-              Depends: {{ stage.dependsOn.join(', ') }}
+              依赖: {{ stage.dependsOn.join(', ') }}
             </div>
             <span class="badge" :class="stage.status.toLowerCase()">{{ stage.status }}</span>
           </div>
-          <div v-if="!selectedSafe.stages.length" class="empty-state">No stages available.</div>
+          <div v-if="!selectedSafe.stages.length" class="empty-state">暂无阶段信息。</div>
         </div>
         </div>
       </div>

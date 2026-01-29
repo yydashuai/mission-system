@@ -11,10 +11,6 @@ const isLoading = computed(() => dataStore.loading.nodes)
 const selectedKey = ref('')
 const focusStore = useFocusStore()
 
-const selected = computed(() => (
-  nodes.value.find((item) => item.name === selectedKey.value) || null
-))
-
 watch(nodes, (list) => {
   if (!list.length) return
   const exists = list.some((item) => item.name === selectedKey.value)
@@ -23,11 +19,10 @@ watch(nodes, (list) => {
   }
 }, { immediate: true })
 
-watch(selected, (value) => {
-  if (value) {
-    focusStore.setFocus('node', value)
-  }
-}, { immediate: true })
+const selectNode = (node) => {
+  selectedKey.value = node.name
+  focusStore.setFocus('node', node)
+}
 
 const readyCount = computed(() => nodes.value.filter((item) => item.status === 'Ready').length)
 const totalNodes = computed(() => nodes.value.length)
@@ -43,35 +38,35 @@ const podsInUse = computed(() => {
   <section class="page">
     <header class="page-header">
       <div>
-        <div class="page-title">Cluster</div>
-        <div class="page-sub">Nodes, pods, events, and basic health.</div>
+        <div class="page-title">集群</div>
+        <div class="page-sub">节点、容器组、事件及基础健康状态。</div>
       </div>
       <div class="page-actions">
-        <button class="ghost small">Refresh</button>
-        <button class="ghost small">Download Events</button>
+        <button class="ghost small">刷新</button>
+        <button class="ghost small">下载事件</button>
       </div>
     </header>
 
     <section class="stat-grid">
       <div class="stat-card">
-        <div class="stat-label">Nodes Ready</div>
+        <div class="stat-label">节点就绪</div>
         <div class="stat-value">{{ readyCount }} / {{ totalNodes }}</div>
-        <div class="stat-meta">{{ totalNodes - readyCount }} node tainted</div>
+        <div class="stat-meta">{{ totalNodes - readyCount }} 节点污点</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Pods Running</div>
+        <div class="stat-label">运行容器组</div>
         <div class="stat-value">{{ podsInUse }}</div>
-        <div class="stat-meta">Across {{ totalNodes }} nodes</div>
+        <div class="stat-meta">分布于 {{ totalNodes }} 个节点</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">CoreDNS</div>
-        <div class="stat-value">Healthy</div>
-        <div class="stat-meta">2 replicas</div>
+        <div class="stat-value">健康</div>
+        <div class="stat-meta">2 副本</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Calico</div>
-        <div class="stat-value">Degraded</div>
-        <div class="stat-meta">1 warning</div>
+        <div class="stat-value">降级</div>
+        <div class="stat-meta">1 警告</div>
       </div>
     </section>
 
@@ -79,11 +74,11 @@ const podsInUse = computed(() => {
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Nodes</div>
-            <div class="panel-sub">Capacity and utilization snapshot.</div>
+            <div class="panel-title">节点</div>
+            <div class="panel-sub">容量与利用率快照。</div>
           </div>
-          <span v-if="isLoading" class="badge warn">Loading</span>
-          <span v-else class="badge">{{ nodes.length }} nodes</span>
+          <span v-if="isLoading" class="badge warn">加载中</span>
+          <span v-else class="badge">{{ nodes.length }} 节点</span>
         </div>
         <div class="node-grid">
           <button
@@ -92,12 +87,12 @@ const podsInUse = computed(() => {
             class="node-card"
             :class="{ 'is-active': selectedKey === node.name }"
             type="button"
-            @click="selectedKey = node.name"
+            @click="selectNode(node)"
           >
             <div class="node-head">
               <div>
                 <div class="node-name">{{ node.name }}</div>
-                <div class="node-meta">{{ node.role }} · zone {{ node.zone }}</div>
+                <div class="node-meta">{{ node.role }} · 区域 {{ node.zone }}</div>
               </div>
               <span class="badge" :class="node.status === 'Ready' ? 'ok' : 'err'">{{ node.status }}</span>
             </div>
@@ -109,28 +104,28 @@ const podsInUse = computed(() => {
               <span class="muted">{{ node.cpu }}%</span>
             </div>
             <div class="util-row">
-              <span class="muted">Memory</span>
+              <span class="muted">内存</span>
               <div class="util-track">
                 <div class="util-fill" :style="{ width: node.memory + '%' }"></div>
               </div>
               <span class="muted">{{ node.memory }}%</span>
             </div>
             <div class="kv">
-              <span>Pods</span>
+              <span>容器组</span>
               <span>{{ node.pods }}</span>
             </div>
           </button>
-          <div v-if="!nodes.length && !isLoading" class="empty-state">No nodes available.</div>
+          <div v-if="!nodes.length && !isLoading" class="empty-state">无可用节点。</div>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Recent Events</div>
-            <div class="panel-sub">Last 24h from scheduler and kubelet.</div>
+            <div class="panel-title">近期事件</div>
+            <div class="panel-sub">调度器与 kubelet 最近 24 小时。</div>
           </div>
-          <span class="badge">{{ events.length }} events</span>
+          <span class="badge">{{ events.length }} 事件</span>
         </div>
         <div class="event-stream">
           <div v-for="item in events" :key="item.time + item.message" class="event-row">
@@ -138,32 +133,32 @@ const podsInUse = computed(() => {
             <span class="badge" :class="item.level">{{ item.scope }}</span>
             <span class="event-text">{{ item.message }}</span>
           </div>
-          <div v-if="!events.length" class="empty-state">No events available.</div>
+          <div v-if="!events.length" class="empty-state">无可用事件。</div>
         </div>
 
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Namespaces</div>
-              <div class="panel-sub">Pod distribution snapshot.</div>
+              <div class="panel-title">命名空间</div>
+              <div class="panel-sub">容器组分布快照。</div>
             </div>
           </div>
           <div class="namespace-list">
             <div class="namespace-row">
               <span>airforce-system</span>
-              <span class="muted">14 pods</span>
+              <span class="muted">14 容器组</span>
             </div>
             <div class="namespace-row">
               <span>kube-system</span>
-              <span class="muted">12 pods</span>
+              <span class="muted">12 容器组</span>
             </div>
             <div class="namespace-row">
               <span>default</span>
-              <span class="muted">8 pods</span>
+              <span class="muted">8 容器组</span>
             </div>
             <div class="namespace-row">
               <span>mission-runtime</span>
-              <span class="muted">4 pods</span>
+              <span class="muted">4 容器组</span>
             </div>
           </div>
         </div>
