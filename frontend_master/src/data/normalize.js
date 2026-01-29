@@ -1,70 +1,28 @@
-// 中文翻译映射
-const translations = {
-  // 状态翻译
-  status: {
-    running: '运行中',
-    pending: '待执行',
-    scheduled: '已调度',
-    succeeded: '已完成',
-    failed: '失败',
-    ready: '就绪',
-    notready: '未就绪',
-    unknown: '未知',
-    available: '可用',
-    updating: '更新中',
-    degraded: '降级',
-    deprecated: '已弃用',
-    retired: '已退役',
-  },
-  // 模式翻译
-  mode: {
-    parallel: '并行',
-    sequential: '串行',
-  },
-  // 优先级翻译
-  priority: {
-    high: '高',
-    normal: '普通',
-    low: '低',
-    critical: '紧急',
-    medium: '普通',
-  },
-  // 失败策略翻译
-  failurePolicy: {
-    continue: '继续',
-    abort: '中止',
-  },
-}
-
 const titleCase = (value) => {
   if (!value) return '--'
-  const text = String(value).toLowerCase()
-  return text.charAt(0).toUpperCase() + text.slice(1)
+  return String(value)
 }
 
 const missionTypeLabel = (value) => {
   const text = String(value || '').toLowerCase()
   if (text === 'isr') return 'ISR'
   if (!text) return '--'
-  return titleCase(text)
+  return titleCase(value)
 }
 
 const priorityLabel = (value) => {
-  const text = String(value || '').toLowerCase()
-  if (!text) return '--'
-  return translations.priority[text] || titleCase(text)
+  if (!value) return '--'
+  return titleCase(value)
 }
 
 const stageTypeLabel = (value) => {
   if (!value) return '--'
-  const text = String(value).toLowerCase()
-  return translations.mode[text] || titleCase(value)
+  return titleCase(value)
 }
 
 const phaseLabel = (value) => {
   if (!value) return '--'
-  const text = String(value).toLowerCase()
-  return translations.status[text] || titleCase(value)
+  return titleCase(value)
 }
 
 const formatTime = (value) => {
@@ -181,8 +139,7 @@ const buildObjective = (objective) => {
 const buildFailurePolicy = (config) => {
   const action = config?.failurePolicy?.stageFailureAction
   if (!action) return '--'
-  const text = String(action).toLowerCase()
-  return translations.failurePolicy[text] || titleCase(action)
+  return titleCase(action)
 }
 
 const buildMissionStages = (specStages, summary) => {
@@ -196,7 +153,7 @@ const buildMissionStages = (specStages, summary) => {
   return (specStages || []).map((stage) => ({
     name: stage.displayName || stage.name || '--',
     mode: stageTypeLabel(stage.type),
-    status: phaseLabel(summaryMap.get(stage.name) || 'Pending'),
+    status: phaseLabel(summaryMap.get(stage.name) || '待执行'),
     tasks: Array.isArray(stage.flightTasks) ? stage.flightTasks.length : 0,
     dependsOn: Array.isArray(stage.dependsOn) ? stage.dependsOn : [],
   }))
@@ -215,7 +172,7 @@ const buildStageTasks = (taskStatus, taskSpec) => {
   if (Array.isArray(taskSpec) && taskSpec.length) {
     return taskSpec.map((item) => ({
       name: item.name || '--',
-      status: translations.status.pending,
+      status: '待执行',
       eta: '--',
       node: '--',
     }))
@@ -306,10 +263,10 @@ const buildNodeZone = (labels) => (
 )
 
 const buildNodeStatus = (conditions) => {
-  if (!Array.isArray(conditions)) return translations.status.unknown
+  if (!Array.isArray(conditions)) return '未知'
   const ready = conditions.find((item) => item.type === 'Ready')
-  if (!ready) return translations.status.unknown
-  return ready.status === 'True' ? translations.status.ready : translations.status.notready
+  if (!ready) return '未知'
+  return ready.status === 'True' ? '就绪' : '未就绪'
 }
 
 const buildEventTone = (value, reason) => {
@@ -341,7 +298,7 @@ export const normalizeMissionList = (payload) => {
       name: spec.missionName || item.metadata?.name || '--',
       type: missionTypeLabel(spec.missionType),
       priority: priorityLabel(spec.priority),
-      status: buildWeaponStatus(status.phase),
+      status: phaseLabel(status.phase),
       commander: metaValue(item, 'commander') || metaValue(item, 'mission.airforce.mil/commander') || '--',
       region: spec.objective?.targetArea || metaValue(item, 'region') || '--',
       updated: formatTime(status.lastUpdateTime || item.metadata?.creationTimestamp),

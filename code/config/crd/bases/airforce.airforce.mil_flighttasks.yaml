@@ -236,11 +236,11 @@ spec:
                 type: object
               phase:
                 enum:
-                - Pending
-                - Scheduled
-                - Running
-                - Succeeded
-                - Failed
+                - 待执行
+                - 已调度
+                - 运行中
+                - 已完成
+                - 失败
                 type: string
               podRef:
                 description: |-

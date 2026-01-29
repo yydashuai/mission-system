@@ -44,19 +44,19 @@ const (
 type MissionPhase string
 
 const (
-	MissionPhasePending   MissionPhase = "Pending"
-	MissionPhaseRunning   MissionPhase = "Running"
-	MissionPhaseSucceeded MissionPhase = "Succeeded"
-	MissionPhaseFailed    MissionPhase = "Failed"
-	MissionPhaseCancelled MissionPhase = "Cancelled"
+	MissionPhasePending   MissionPhase = "待执行"
+	MissionPhaseRunning   MissionPhase = "运行中"
+	MissionPhaseSucceeded MissionPhase = "已完成"
+	MissionPhaseFailed    MissionPhase = "失败"
+	MissionPhaseCancelled MissionPhase = "已取消"
 )
 
 type StageExecutionType string
 
 const (
-	StageExecutionTypeSequential StageExecutionType = "sequential"
-	StageExecutionTypeParallel   StageExecutionType = "parallel"
-	StageExecutionTypeMixed      StageExecutionType = "mixed"
+	StageExecutionTypeSequential StageExecutionType = "串行"
+	StageExecutionTypeParallel   StageExecutionType = "并行"
+	StageExecutionTypeMixed      StageExecutionType = "混合"
 )
 
 type RetryStrategy string
@@ -70,9 +70,9 @@ const (
 type StageFailureAction string
 
 const (
-	StageFailureActionAbort    StageFailureAction = "abort"
-	StageFailureActionContinue StageFailureAction = "continue"
-	StageFailureActionRetry    StageFailureAction = "retry"
+	StageFailureActionAbort    StageFailureAction = "中止"
+	StageFailureActionContinue StageFailureAction = "继续"
+	StageFailureActionRetry    StageFailureAction = "重试"
 )
 
 type MissionObjective struct {
@@ -154,7 +154,7 @@ type MissionStatistics struct {
 
 // MissionStatus defines the observed state of Mission
 type MissionStatus struct {
-	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed;Cancelled
+	// +kubebuilder:validation:Enum=待执行;运行中;已完成;失败;已取消
 	Phase MissionPhase `json:"phase,omitempty"`
 
 	StagesSummary []MissionStageSummary `json:"stagesSummary,omitempty"`

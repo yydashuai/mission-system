@@ -91,9 +91,9 @@ type WeaponSpec struct {
 type WeaponPhase string
 
 const (
-	WeaponPhaseAvailable  WeaponPhase = "Available"
-	WeaponPhaseUpdating   WeaponPhase = "Updating"
-	WeaponPhaseDeprecated WeaponPhase = "Deprecated"
+	WeaponPhaseAvailable  WeaponPhase = "可用"
+	WeaponPhaseUpdating   WeaponPhase = "更新中"
+	WeaponPhaseDeprecated WeaponPhase = "已弃用"
 )
 
 type WeaponUsage struct {
@@ -110,7 +110,7 @@ type WeaponCompatibilityCheck struct {
 
 // WeaponStatus defines the observed state of Weapon
 type WeaponStatus struct {
-	// +kubebuilder:validation:Enum=Available;Updating;Deprecated
+	// +kubebuilder:validation:Enum=可用;更新中;已弃用
 	Phase WeaponPhase `json:"phase,omitempty"`
 
 	Usage               *WeaponUsage               `json:"usage,omitempty"`

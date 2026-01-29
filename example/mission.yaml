@@ -3,7 +3,7 @@ kind: Mission
 metadata:
   name: demo-mission
 spec:
-  missionName: "demo-mission"
+  missionName: "示例任务"
   missionType: strike
   priority: high
   objective:
@@ -15,7 +15,7 @@ spec:
   stages:
     - name: stage1-isr
       displayName: "侦察"
-      type: parallel
+      type: 并行
       flightTasks:
         - aircraft: j20
           role: reconnaissance
@@ -69,7 +69,7 @@ spec:
             speed: 760km/h
     - name: stage2-strike
       displayName: "打击"
-      type: sequential
+      type: 串行
       dependsOn: ["stage1-isr"]
       flightTasks:
         - aircraft: j20
@@ -128,7 +128,7 @@ spec:
             speed: 730km/h
     - name: stage3-assess
       displayName: "评估"
-      type: parallel
+      type: 并行
       dependsOn: ["stage2-strike"]
       flightTasks:
         - aircraft: j20
@@ -174,7 +174,7 @@ spec:
     failurePolicy:
       maxRetries: 3
       retryStrategy: exponential
-      stageFailureAction: continue
+      stageFailureAction: 继续
     cancellationPolicy:
       gracePeriod: 300s
       cleanup: true

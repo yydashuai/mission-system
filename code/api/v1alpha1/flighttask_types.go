@@ -104,7 +104,7 @@ type ExecutionStatus struct {
 
 // FlightTaskStatus defines the observed state of FlightTask
 type FlightTaskStatus struct {
-	// +kubebuilder:validation:Enum=Pending;Scheduled;Running;Succeeded;Failed
+	// +kubebuilder:validation:Enum=待执行;已调度;运行中;已完成;失败
 	Phase FlightTaskPhase `json:"phase,omitempty"`
 
 	SchedulingInfo  *SchedulingInfo         `json:"schedulingInfo,omitempty"`

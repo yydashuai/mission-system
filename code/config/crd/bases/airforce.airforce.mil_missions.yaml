@@ -169,11 +169,11 @@ spec:
                 type: string
               phase:
                 enum:
-                - Pending
-                - Running
-                - Succeeded
-                - Failed
-                - Cancelled
+                - 待执行
+                - 运行中
+                - 已完成
+                - 失败
+                - 已取消
                 type: string
               stagesSummary:
                 items:

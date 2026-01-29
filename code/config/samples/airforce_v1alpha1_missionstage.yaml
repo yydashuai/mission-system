@@ -13,7 +13,7 @@ spec:
     name: mission-sample
   stageName: "侦察"
   stageIndex: 1
-  stageType: sequential
+  stageType: 串行
   flightTasks:
     - name: ft-kj500-001
       aircraft: kj500

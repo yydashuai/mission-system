@@ -21,7 +21,7 @@ spec:
   stages:
     - name: stage1-isr
       displayName: "侦察"
-      type: sequential
+      type: 串行
       flightTasks:
         - aircraft: j20
           role: reconnaissance
@@ -31,7 +31,7 @@ spec:
             speed: 800km/h
     - name: stage2-strike
       displayName: "打击"
-      type: parallel
+      type: 并行
       dependsOn: ["stage1-isr"]
       flightTasks:
         - aircraft: h6k
@@ -44,7 +44,7 @@ spec:
     failurePolicy:
       maxRetries: 3
       retryStrategy: exponential
-      stageFailureAction: abort
+      stageFailureAction: 中止
     cancellationPolicy:
       gracePeriod: 300s
       cleanup: true

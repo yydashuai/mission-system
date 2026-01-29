@@ -31,20 +31,20 @@ type MissionRef struct {
 type MissionStagePhase string
 
 const (
-	MissionStagePhasePending   MissionStagePhase = "Pending"
-	MissionStagePhaseRunning   MissionStagePhase = "Running"
-	MissionStagePhaseSucceeded MissionStagePhase = "Succeeded"
-	MissionStagePhaseFailed    MissionStagePhase = "Failed"
+	MissionStagePhasePending   MissionStagePhase = "待执行"
+	MissionStagePhaseRunning   MissionStagePhase = "运行中"
+	MissionStagePhaseSucceeded MissionStagePhase = "已完成"
+	MissionStagePhaseFailed    MissionStagePhase = "失败"
 )
 
 type FlightTaskPhase string
 
 const (
-	FlightTaskPhasePending   FlightTaskPhase = "Pending"
-	FlightTaskPhaseScheduled FlightTaskPhase = "Scheduled"
-	FlightTaskPhaseRunning   FlightTaskPhase = "Running"
-	FlightTaskPhaseSucceeded FlightTaskPhase = "Succeeded"
-	FlightTaskPhaseFailed    FlightTaskPhase = "Failed"
+	FlightTaskPhasePending   FlightTaskPhase = "待执行"
+	FlightTaskPhaseScheduled FlightTaskPhase = "已调度"
+	FlightTaskPhaseRunning   FlightTaskPhase = "运行中"
+	FlightTaskPhaseSucceeded FlightTaskPhase = "已完成"
+	FlightTaskPhaseFailed    FlightTaskPhase = "失败"
 )
 
 type WeaponLoadoutItem struct {
@@ -89,7 +89,7 @@ type MissionStageSpec struct {
 	StageName  string `json:"stageName,omitempty"`
 	StageIndex int32  `json:"stageIndex,omitempty"`
 
-	// +kubebuilder:validation:Enum=sequential;parallel;mixed
+	// +kubebuilder:validation:Enum=串行;并行;混合
 	StageType StageExecutionType `json:"stageType,omitempty"`
 
 	DependsOn []string `json:"dependsOn,omitempty"`
@@ -109,7 +109,7 @@ type MissionStageFlightTaskStatus struct {
 
 // MissionStageStatus defines the observed state of MissionStage
 type MissionStageStatus struct {
-	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed
+	// +kubebuilder:validation:Enum=待执行;运行中;已完成;失败
 	Phase MissionStagePhase `json:"phase,omitempty"`
 
 	FlightTasksStatus []MissionStageFlightTaskStatus `json:"flightTasksStatus,omitempty"`

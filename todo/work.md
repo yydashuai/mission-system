@@ -271,3 +271,39 @@
 - ✅ 保留 API 返回的动态数据不变，仅翻译界面固定文本
 - ✅ 采用军用系统专业术语（任务控制中心、飞行任务、武器系统、调度约束等）
 - ✅ 更新页面语言设置为 zh-CN
+
+#### 前端 API 数据中文化
+- ✅ 在 normalize.js 中添加中文翻译映射表
+- ✅ 翻译所有状态值（运行中、待执行、已完成、失败等）
+- ✅ 翻译执行模式（并行、串行）
+- ✅ 翻译优先级和失败策略
+- ✅ 修复所有页面中硬编码的英文状态判断逻辑
+
+#### 前端时区和时间格式优化
+- ✅ 将时间从 UTC 改为中国时区（UTC+8）
+- ✅ 时间格式改为完整日期时间（YYYY-MM-DD HH:mm:ss）
+- ✅ 移除时区标签，直接显示时间
+
+#### 前端设置页面优化
+- ✅ 简化设置页面，移除只读模式切换和安全说明
+- ✅ 添加保存按钮，修改后才可点击
+- ✅ 实现 localStorage 持久化保存配置
+- ✅ 配置加载优先级：默认配置 → window.__APP_CONFIG__ → localStorage
+- ✅ 默认改为非只读模式
+- ✅ 移除快捷命令面板，保持界面简洁
+
+#### 后端 CRD 中文化（从源头解决）
+- ✅ 修改 mission_types.go 中的状态常量为中文
+  - MissionPhase: Pending → 待执行, Running → 运行中, Succeeded → 已完成, Failed → 失败
+  - StageExecutionType: sequential → 串行, parallel → 并行
+  - StageFailureAction: abort → 中止, continue → 继续, retry → 重试
+- ✅ 修改 missionstage_types.go 中的状态常量为中文
+  - MissionStagePhase 和 FlightTaskPhase 状态值中文化
+- ✅ 修改 weapon_types.go 中的状态常量为中文
+  - WeaponPhase: Available → 可用, Updating → 更新中, Deprecated → 已弃用
+- ✅ 更新 kubebuilder 验证注解
+- ✅ 简化前端 normalize.js，移除翻译层，直接使用原始值
+- ✅ 更新示例 YAML 清单使用中文状态值
+  - /project/example/mission.yaml
+  - /project/code/config/samples/airforce_v1alpha1_mission.yaml
+  - /project/code/config/samples/airforce_v1alpha1_missionstage.yaml

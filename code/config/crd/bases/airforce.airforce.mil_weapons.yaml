@@ -481,9 +481,9 @@ spec:
                 type: array
               phase:
                 enum:
-                - Available
-                - Updating
-                - Deprecated
+                - 可用
+                - 更新中
+                - 已弃用
                 type: string
               usage:
                 properties:
