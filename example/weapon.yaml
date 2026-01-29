@@ -4,7 +4,7 @@ metadata:
   name: pl-15
 spec:
   weaponName: "PL-15"
-  weaponType: "missile"
+  weaponType: "导弹"
   image:
     repository: "busybox"
     tag: "1.36"

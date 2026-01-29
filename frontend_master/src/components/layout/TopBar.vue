@@ -40,7 +40,7 @@ const handleSync = async () => {
     <div class="topbar-status">
       <span class="badge" :class="statusTone">{{ statusLabel }}</span>
       <span class="badge">刷新 {{ systemStore.refreshLabel }}</span>
-      <span class="badge muted">UTC {{ systemStore.timeLabel }}</span>
+      <span class="badge muted">{{ systemStore.timeLabel }}</span>
     </div>
     <div class="topbar-actions">
       <button class="ghost" type="button" @click="handleSync">同步</button>

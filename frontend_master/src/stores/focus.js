@@ -5,14 +5,14 @@ export const useFocusStore = defineStore('focus', {
     kind: 'flighttask',
     item: {
       name: 'ft-alpha-9',
-      status: 'Scheduled',
+      status: '已调度',
       mission: 'SeaStrike-02',
       stage: 'Strike-Phase',
       node: 'worker-1',
       weapon: 'PL-15',
       attempts: 2,
       scheduledAt: '08:14',
-      podStatus: 'Pending',
+      podStatus: '待执行',
     },
     events: [
       { time: '08:21', label: 'FT-ghost-12 待调度: 节点亲和性不满足', tone: 'warn' },

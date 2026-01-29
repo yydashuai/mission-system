@@ -7,7 +7,10 @@ let apiTimer = null
 
 const formatTime = (date) => {
   if (!date) return '--'
-  return date.toISOString().slice(11, 19)
+  // 转换为中国时区（UTC+8）
+  const chinaTime = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  // 格式化为 YYYY-MM-DD HH:mm:ss
+  return chinaTime.toISOString().slice(0, 19).replace('T', ' ')
 }
 
 const formatSeconds = (value) => `${Math.round(value / 1000)}s`

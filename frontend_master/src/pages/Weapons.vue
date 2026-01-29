@@ -23,25 +23,21 @@ const emptyWeapon = {
   usage: '--',
   aircraft: [],
   hardpoints: [],
-  resources: '--',
+  type: '--',
 }
 
 const statusOptions = [
   { value: 'all', label: '全部' },
-  { value: 'Available', label: '可用' },
-  { value: 'Updating', label: '更新中' },
-  { value: 'Degraded', label: '降级' },
-  { value: 'Deprecated', label: '已弃用' },
-  { value: 'Retired', label: '已退役' },
+  { value: '可用', label: '可用' },
+  { value: '更新中', label: '更新中' },
+  { value: '已弃用', label: '已弃用' },
 ]
 
 const statusScore = (value) => {
   const key = String(value || '').toLowerCase()
-  if (key === 'available') return 5
-  if (key === 'updating') return 4
-  if (key === 'degraded') return 3
-  if (key === 'deprecated') return 2
-  if (key === 'retired') return 1
+  if (key === '可用' || key === 'available') return 3
+  if (key === '更新中' || key === 'updating') return 2
+  if (key === '已弃用' || key === 'deprecated' || key === 'degraded' || key === 'retired') return 1
   return 0
 }
 
@@ -66,7 +62,7 @@ const filteredWeapons = computed(() => {
 
   if (text) {
     list = list.filter((weapon) => {
-      const haystack = [weapon.name, weapon.image, weapon.version, weapon.resources]
+      const haystack = [weapon.name, weapon.image, weapon.version, weapon.type]
         .join(' ')
         .toLowerCase()
       return haystack.includes(text)
@@ -131,9 +127,9 @@ const selectWeapon = (weapon) => {
 }
 
 const statusTone = (status) => {
-  if (status === 'Available') return 'ok'
-  if (status === 'Updating' || status === 'Degraded') return 'warn'
-  if (status === 'Deprecated' || status === 'Retired') return 'muted'
+  if (status === '可用') return 'ok'
+  if (status === '更新中') return 'warn'
+  if (status === '已弃用') return 'muted'
   return 'muted'
 }
 </script>
@@ -167,7 +163,7 @@ const statusTone = (status) => {
             v-model="query"
             class="input"
             type="search"
-            placeholder="搜索武器、镜像、资源"
+            placeholder="搜索武器、镜像、类型"
           />
           <div class="segmented">
             <button
@@ -217,7 +213,7 @@ const statusTone = (status) => {
           >
             <div class="cell-main">
               <div class="cell-title">{{ weapon.name }}</div>
-              <div class="cell-sub">{{ weapon.resources }}</div>
+              <div class="cell-sub">{{ weapon.type }}</div>
             </div>
             <span class="badge" :class="statusTone(weapon.status)">{{ weapon.status }}</span>
             <span class="muted">{{ weapon.image }}</span>
@@ -247,8 +243,8 @@ const statusTone = (status) => {
           </div>
           <div class="detail-info">
             <div class="kv">
-              <span>资源</span>
-              <span>{{ selectedSafe.resources }}</span>
+              <span>类型</span>
+              <span>{{ selectedSafe.type }}</span>
             </div>
             <div class="kv">
               <span>镜像</span>

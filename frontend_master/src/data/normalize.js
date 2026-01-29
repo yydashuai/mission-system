@@ -1,3 +1,41 @@
+// 中文翻译映射
+const translations = {
+  // 状态翻译
+  status: {
+    running: '运行中',
+    pending: '待执行',
+    scheduled: '已调度',
+    succeeded: '已完成',
+    failed: '失败',
+    ready: '就绪',
+    notready: '未就绪',
+    unknown: '未知',
+    available: '可用',
+    updating: '更新中',
+    degraded: '降级',
+    deprecated: '已弃用',
+    retired: '已退役',
+  },
+  // 模式翻译
+  mode: {
+    parallel: '并行',
+    sequential: '串行',
+  },
+  // 优先级翻译
+  priority: {
+    high: '高',
+    normal: '普通',
+    low: '低',
+    critical: '紧急',
+    medium: '普通',
+  },
+  // 失败策略翻译
+  failurePolicy: {
+    continue: '继续',
+    abort: '中止',
+  },
+}
+
 const titleCase = (value) => {
   if (!value) return '--'
   const text = String(value).toLowerCase()
@@ -13,20 +51,20 @@ const missionTypeLabel = (value) => {
 
 const priorityLabel = (value) => {
   const text = String(value || '').toLowerCase()
-  if (text === 'medium') return 'Normal'
-  if (text === 'critical') return 'Critical'
   if (!text) return '--'
-  return titleCase(text)
+  return translations.priority[text] || titleCase(text)
 }
 
 const stageTypeLabel = (value) => {
   if (!value) return '--'
-  return titleCase(value)
+  const text = String(value).toLowerCase()
+  return translations.mode[text] || titleCase(value)
 }
 
 const phaseLabel = (value) => {
   if (!value) return '--'
-  return titleCase(value)
+  const text = String(value).toLowerCase()
+  return translations.status[text] || titleCase(value)
 }
 
 const formatTime = (value) => {
@@ -142,7 +180,9 @@ const buildObjective = (objective) => {
 
 const buildFailurePolicy = (config) => {
   const action = config?.failurePolicy?.stageFailureAction
-  return action ? titleCase(action) : '--'
+  if (!action) return '--'
+  const text = String(action).toLowerCase()
+  return translations.failurePolicy[text] || titleCase(action)
 }
 
 const buildMissionStages = (specStages, summary) => {
@@ -175,7 +215,7 @@ const buildStageTasks = (taskStatus, taskSpec) => {
   if (Array.isArray(taskSpec) && taskSpec.length) {
     return taskSpec.map((item) => ({
       name: item.name || '--',
-      status: 'Pending',
+      status: translations.status.pending,
       eta: '--',
       node: '--',
     }))
@@ -218,16 +258,6 @@ const buildTaskConditions = (conditions) => {
   })
 }
 
-const buildWeaponResources = (resources) => {
-  if (!resources) return '--'
-  const parts = []
-  if (Number.isFinite(resources.hardpoints)) parts.push(`hp ${resources.hardpoints}`)
-  if (Number.isFinite(resources.weight)) parts.push(`weight ${resources.weight}`)
-  if (Number.isFinite(resources.power)) parts.push(`power ${resources.power}`)
-  if (resources.cooling) parts.push(`cooling ${resources.cooling}`)
-  return parts.length ? parts.join(' · ') : '--'
-}
-
 const buildWeaponUsage = (usage) => {
   if (!usage) return '--'
   if (Number.isFinite(usage.totalDeployed)) return `${usage.totalDeployed} deployed`
@@ -235,12 +265,28 @@ const buildWeaponUsage = (usage) => {
   return '--'
 }
 
-const buildWeaponImage = (image) => {
+const buildWeaponRepository = (image) => {
   if (!image) return '--'
-  if (image.repository && image.tag) return `${image.repository}:${image.tag}`
   return image.repository || '--'
 }
 
+const buildWeaponTag = (image, version) => {
+  if (image?.tag) return image.tag
+  if (version?.current) return version.current
+  return '--'
+}
+
+const buildWeaponStatus = (value) => {
+  if (!value) return '--'
+  const text = String(value).trim()
+  const key = text.toLowerCase()
+  if (key === 'available' || text === '可用') return '可用'
+  if (key === 'updating' || text === '更新中') return '更新中'
+  if (key === 'deprecated' || key === 'degraded' || key === 'retired' || text === '已弃用' || text === '降级' || text === '已退役') {
+    return '已弃用'
+  }
+  return '--'
+}
 const buildNodeRole = (labels) => {
   if (!labels) return 'worker'
   if (Object.prototype.hasOwnProperty.call(labels, 'node-role.kubernetes.io/control-plane')) {
@@ -260,10 +306,10 @@ const buildNodeZone = (labels) => (
 )
 
 const buildNodeStatus = (conditions) => {
-  if (!Array.isArray(conditions)) return 'Unknown'
+  if (!Array.isArray(conditions)) return translations.status.unknown
   const ready = conditions.find((item) => item.type === 'Ready')
-  if (!ready) return 'Unknown'
-  return ready.status === 'True' ? 'Ready' : 'NotReady'
+  if (!ready) return translations.status.unknown
+  return ready.status === 'True' ? translations.status.ready : translations.status.notready
 }
 
 const buildEventTone = (value, reason) => {
@@ -278,7 +324,12 @@ const buildEventTone = (value, reason) => {
 export const normalizeMissionList = (payload) => {
   const list = normalizeList(payload)
   if (!list.length) return []
-  if (!isK8sItem(list[0])) return list
+  if (!isK8sItem(list[0])) {
+    return list.map((item) => ({
+      ...item,
+      status: buildWeaponStatus(item.status),
+    }))
+  }
 
   return list.map((item) => {
     const spec = item.spec || {}
@@ -290,7 +341,7 @@ export const normalizeMissionList = (payload) => {
       name: spec.missionName || item.metadata?.name || '--',
       type: missionTypeLabel(spec.missionType),
       priority: priorityLabel(spec.priority),
-      status: phaseLabel(status.phase),
+      status: buildWeaponStatus(status.phase),
       commander: metaValue(item, 'commander') || metaValue(item, 'mission.airforce.mil/commander') || '--',
       region: spec.objective?.targetArea || metaValue(item, 'region') || '--',
       updated: formatTime(status.lastUpdateTime || item.metadata?.creationTimestamp),
@@ -364,12 +415,12 @@ export const normalizeWeaponList = (payload) => {
     return {
       name: spec.weaponName || item.metadata?.name || '--',
       status: phaseLabel(status.phase),
-      image: buildWeaponImage(spec.image),
-      version: spec.version?.current || '--',
+      image: buildWeaponRepository(spec.image),
+      version: buildWeaponTag(spec.image, spec.version),
       usage: buildWeaponUsage(status.usage),
       aircraft: spec.compatibility?.aircraftTypes || [],
       hardpoints: spec.compatibility?.hardpointTypes || [],
-      resources: buildWeaponResources(spec.resources),
+      type: spec.weaponType || '--',
     }
   })
 }

@@ -10,13 +10,13 @@ const { missions, stages, flightTasks, weapons } = storeToRefs(dataStore)
 
 const totalMissions = computed(() => missions.value.length)
 const activeMissions = computed(() => missions.value.filter((item) => (
-  item.status !== 'Succeeded' && item.status !== 'Failed'
+  item.status !== '已完成' && item.status !== '失败'
 )))
-const runningStages = computed(() => stages.value.filter((item) => item.status === 'Running'))
+const runningStages = computed(() => stages.value.filter((item) => item.status === '运行中'))
 const waitingTasks = computed(() => flightTasks.value.filter((item) => (
-  item.status === 'Pending' || item.status === 'Scheduled'
+  item.status === '待执行' || item.status === '已调度'
 )))
-const readyWeapons = computed(() => weapons.value.filter((item) => item.status === 'Available'))
+const readyWeapons = computed(() => weapons.value.filter((item) => item.status === '可用'))
 
 const kpis = computed(() => ([
   {
@@ -67,13 +67,13 @@ const activeStage = computed(() => {
   const list = stages.value
   if (!list.length) return null
   const pick = (status) => list.find((item) => item.status === status) || null
-  return pick('Running') || pick('Scheduled') || pick('Pending') || list[0]
+  return pick('运行中') || pick('已调度') || pick('待执行') || list[0]
 })
 
 const stageStatus = computed(() => String(activeStage.value?.status || '').toLowerCase())
 const stageTasks = computed(() => activeStage.value?.tasks || [])
 const activeTaskCount = computed(() => stageTasks.value.filter((item) => (
-  item.status === 'Running' || item.status === 'Scheduled'
+  item.status === '运行中' || item.status === '已调度'
 )).length)
 
 const timelineClass = computed(() => {

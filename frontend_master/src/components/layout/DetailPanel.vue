@@ -75,7 +75,7 @@ const focusBadges = computed(() => {
     ]
   }
   if (focusStore.kind === 'node') {
-    const tone = item.status === 'Ready' ? 'ok' : 'err'
+    const tone = item.status === '就绪' ? 'ok' : 'err'
     return [
       { label: safe(item.status), tone },
       { label: safe(item.role), tone: 'muted' },
@@ -118,7 +118,7 @@ const focusInfo = computed(() => {
     return [
       { label: '镜像', value: safe(item.image) },
       { label: '使用次数', value: safe(item.usage) },
-      { label: '资源', value: safe(item.resources) },
+      { label: '类型', value: safe(item.type) },
       { label: '机型', value: joinList(item.aircraft) },
       { label: '挂载点', value: joinList(item.hardpoints) },
     ]

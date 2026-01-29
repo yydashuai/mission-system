@@ -32,12 +32,12 @@ let refreshTimer = null
 const clone = (value) => JSON.parse(JSON.stringify(value))
 
 const stateDefaults = () => ({
-  missions: clone(seedMissions),
-  stages: clone(seedStages),
-  flightTasks: clone(seedFlightTasks),
-  weapons: clone(seedWeapons),
-  nodes: clone(seedClusterNodes),
-  events: clone(seedClusterEvents),
+  missions: normalizeMissionList(clone(seedMissions)),
+  stages: normalizeStageList(clone(seedStages)),
+  flightTasks: normalizeFlightTaskList(clone(seedFlightTasks)),
+  weapons: normalizeWeaponList(clone(seedWeapons)),
+  nodes: normalizeNodeList(clone(seedClusterNodes)),
+  events: normalizeEventList(clone(seedClusterEvents)),
   loading: {
     missions: false,
     stages: false,

@@ -16,7 +16,7 @@ const isActive = (path) => route.path === path
 const apiOk = computed(() => systemStore.apiStatus === 'ok')
 
 const totalNodes = computed(() => nodes.value.length)
-const readyNodes = computed(() => nodes.value.filter((item) => item.status === 'Ready').length)
+const readyNodes = computed(() => nodes.value.filter((item) => item.status === '就绪').length)
 const controlNode = computed(() => (
   nodes.value.find((item) => item.role === 'control-plane' || item.role === 'master') || null
 ))

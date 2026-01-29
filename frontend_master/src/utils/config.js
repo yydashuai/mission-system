@@ -7,9 +7,11 @@ const DEFAULT_CONFIG = {
   AUTH_TOKEN: '',
   REFRESH_INTERVAL: 10000,
   DETAIL_POLL_INTERVAL: 5000,
-  READ_ONLY: true,
+  READ_ONLY: false,
   VERBOSE_EVENTS: false,
 }
+
+const STORAGE_KEY = 'airforce_config'
 
 const toNumber = (value, fallback) => {
   const parsed = Number(value)
@@ -26,20 +28,39 @@ const toBoolean = (value, fallback) => {
   return fallback
 }
 
+const loadFromStorage = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+export const saveToStorage = (config) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const loadAppConfig = () => {
   const raw = typeof window !== 'undefined' ? window.__APP_CONFIG__ || {} : {}
-  const merged = { ...DEFAULT_CONFIG, ...raw }
+  const stored = loadFromStorage()
+  const merged = { ...DEFAULT_CONFIG, ...raw, ...stored }
 
   return {
-    apiBase: merged.API_BASE || '',
-    apiMode: merged.API_MODE || DEFAULT_CONFIG.API_MODE,
-    namespace: merged.NAMESPACE || DEFAULT_CONFIG.NAMESPACE,
-    authHeader: merged.AUTH_HEADER || DEFAULT_CONFIG.AUTH_HEADER,
-    authScheme: merged.AUTH_SCHEME || DEFAULT_CONFIG.AUTH_SCHEME,
-    authToken: merged.AUTH_TOKEN || DEFAULT_CONFIG.AUTH_TOKEN,
-    refreshInterval: toNumber(merged.REFRESH_INTERVAL, DEFAULT_CONFIG.REFRESH_INTERVAL),
-    detailPollInterval: toNumber(merged.DETAIL_POLL_INTERVAL, DEFAULT_CONFIG.DETAIL_POLL_INTERVAL),
-    readOnly: toBoolean(merged.READ_ONLY, DEFAULT_CONFIG.READ_ONLY),
-    verboseEvents: toBoolean(merged.VERBOSE_EVENTS, DEFAULT_CONFIG.VERBOSE_EVENTS),
+    apiBase: merged.API_BASE || merged.apiBase || '',
+    apiMode: merged.API_MODE || merged.apiMode || DEFAULT_CONFIG.API_MODE,
+    namespace: merged.NAMESPACE || merged.namespace || DEFAULT_CONFIG.NAMESPACE,
+    authHeader: merged.AUTH_HEADER || merged.authHeader || DEFAULT_CONFIG.AUTH_HEADER,
+    authScheme: merged.AUTH_SCHEME || merged.authScheme || DEFAULT_CONFIG.AUTH_SCHEME,
+    authToken: merged.AUTH_TOKEN || merged.authToken || DEFAULT_CONFIG.AUTH_TOKEN,
+    refreshInterval: toNumber(merged.REFRESH_INTERVAL || merged.refreshInterval, DEFAULT_CONFIG.REFRESH_INTERVAL),
+    detailPollInterval: toNumber(merged.DETAIL_POLL_INTERVAL || merged.detailPollInterval, DEFAULT_CONFIG.DETAIL_POLL_INTERVAL),
+    readOnly: toBoolean(merged.READ_ONLY !== undefined ? merged.READ_ONLY : merged.readOnly, DEFAULT_CONFIG.READ_ONLY),
+    verboseEvents: toBoolean(merged.VERBOSE_EVENTS !== undefined ? merged.VERBOSE_EVENTS : merged.verboseEvents, DEFAULT_CONFIG.VERBOSE_EVENTS),
   }
 }

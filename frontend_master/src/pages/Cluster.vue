@@ -24,7 +24,7 @@ const selectNode = (node) => {
   focusStore.setFocus('node', node)
 }
 
-const readyCount = computed(() => nodes.value.filter((item) => item.status === 'Ready').length)
+const readyCount = computed(() => nodes.value.filter((item) => item.status === '就绪').length)
 const totalNodes = computed(() => nodes.value.length)
 const podsInUse = computed(() => {
   return nodes.value.reduce((sum, item) => {
@@ -94,7 +94,7 @@ const podsInUse = computed(() => {
                 <div class="node-name">{{ node.name }}</div>
                 <div class="node-meta">{{ node.role }} · 区域 {{ node.zone }}</div>
               </div>
-              <span class="badge" :class="node.status === 'Ready' ? 'ok' : 'err'">{{ node.status }}</span>
+              <span class="badge" :class="node.status === '就绪' ? 'ok' : 'err'">{{ node.status }}</span>
             </div>
             <div class="util-row">
               <span class="muted">CPU</span>
