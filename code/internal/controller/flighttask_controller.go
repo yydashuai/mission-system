@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +32,7 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,9 +56,11 @@ type FlightTaskReconciler struct {
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=flighttasks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=flighttasks/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch
 //+kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=get;list;watch
 //+kubebuilder:rbac:groups=airforce.airforce.mil,resources=weapons,verbs=get;list;watch
+//+kubebuilder:rbac:groups=airforce.airforce.mil,resources=missions,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -357,11 +362,23 @@ func (r *FlightTaskReconciler) buildPodForTask(ctx context.Context, task *airfor
 		labels["aircraft"] = task.Spec.AircraftRequirement.Type
 	}
 
+	// 准备annotations，用于Webhook识别和处理
+	annotations := map[string]string{}
+	if task.Labels != nil {
+		if missionName := task.Labels["mission"]; missionName != "" {
+			annotations["airforce.mil/mission"] = missionName
+		}
+	}
+
+	// 添加标签标识这是FlightTask的Pod
+	labels["airforce.mil/managed-by"] = "flighttask-controller"
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: task.Namespace,
-			Name:      podName,
-			Labels:    labels,
+			Namespace:   task.Namespace,
+			Name:        podName,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever,
@@ -402,6 +419,12 @@ func (r *FlightTaskReconciler) buildPodForTask(ctx context.Context, task *airfor
 	}
 
 	applyAircraftSchedulingConstraints(pod, task.Spec.AircraftRequirement)
+
+	// 应用距离优先调度
+	if err := r.applyDistanceBasedScheduling(ctx, pod, task); err != nil {
+		// 距离调度失败不影响Pod创建，只记录日志
+		log.FromContext(ctx).Error(err, "failed to apply distance-based scheduling, continuing without it")
+	}
 
 	if err := r.injectWeaponSidecars(ctx, pod, task); err != nil {
 		return nil, err
@@ -1094,6 +1117,202 @@ func hasVolumeMount(mounts []corev1.VolumeMount, name, mountPath string) bool {
 		}
 	}
 	return false
+}
+
+// applyDistanceBasedScheduling 应用基于距离的调度偏好
+func (r *FlightTaskReconciler) applyDistanceBasedScheduling(ctx context.Context, pod *corev1.Pod, task *airforcev1alpha1.FlightTask) error {
+	log := log.FromContext(ctx)
+
+	// 1. 获取Mission名称
+	missionName := task.Labels["mission"]
+	if missionName == "" {
+		return nil // 没有关联Mission，跳过
+	}
+
+	// 2. 查询Mission
+	mission := &airforcev1alpha1.Mission{}
+	err := r.Client.Get(ctx, client.ObjectKey{
+		Namespace: task.Namespace,
+		Name:      missionName,
+	}, mission)
+	if err != nil {
+		return fmt.Errorf("failed to get mission %s: %w", missionName, err)
+	}
+
+	// 3. 检查是否有目标坐标
+	if mission.Spec.Objective == nil || mission.Spec.Objective.TargetCoordinates == nil {
+		return nil // 没有目标坐标，跳过
+	}
+
+	targetCoords := mission.Spec.Objective.TargetCoordinates
+	log.Info("found target coordinates", "mission", missionName,
+		"latitude", targetCoords.Latitude, "longitude", targetCoords.Longitude)
+
+	// 4. 解析目标坐标
+	targetLat, targetLon, err := parseCoordinates(targetCoords)
+	if err != nil {
+		return fmt.Errorf("failed to parse target coordinates: %w", err)
+	}
+
+	// 5. 获取所有符合条件的节点
+	nodeSelector := pod.Spec.NodeSelector
+	if nodeSelector == nil {
+		nodeSelector = make(map[string]string)
+	}
+
+	var nodeList corev1.NodeList
+	labelSelector := labels.SelectorFromSet(nodeSelector)
+	err = r.Client.List(ctx, &nodeList, &client.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	// 6. 计算每个节点的距离
+	type nodeDistance struct {
+		name     string
+		distance float64
+		weight   int32
+	}
+	var distances []nodeDistance
+
+	for _, node := range nodeList.Items {
+		latStr := node.Labels["aircraft.mil/location.latitude"]
+		lonStr := node.Labels["aircraft.mil/location.longitude"]
+
+		if latStr == "" || lonStr == "" {
+			continue // 跳过没有坐标的节点
+		}
+
+		nodeLat, err := strconv.ParseFloat(latStr, 64)
+		if err != nil {
+			continue
+		}
+		nodeLon, err := strconv.ParseFloat(lonStr, 64)
+		if err != nil {
+			continue
+		}
+
+		// 计算距离
+		distance := haversineDistance(targetLat, targetLon, nodeLat, nodeLon)
+		weight := distanceToWeight(distance)
+
+		distances = append(distances, nodeDistance{
+			name:     node.Name,
+			distance: distance,
+			weight:   weight,
+		})
+	}
+
+	if len(distances) == 0 {
+		log.Info("no nodes with coordinates found")
+		return nil
+	}
+
+	// 7. 按距离排序
+	sort.Slice(distances, func(i, j int) bool {
+		return distances[i].distance < distances[j].distance
+	})
+
+	log.Info("calculated node distances", "count", len(distances),
+		"nearest", distances[0].name, "distance", distances[0].distance)
+
+	// 8. 生成PreferredSchedulingTerms（最多8个）
+	maxTerms := 8
+	if len(distances) < maxTerms {
+		maxTerms = len(distances)
+	}
+
+	preferences := make([]corev1.PreferredSchedulingTerm, 0, maxTerms)
+	for i := 0; i < maxTerms; i++ {
+		nd := distances[i]
+		term := corev1.PreferredSchedulingTerm{
+			Weight: nd.weight,
+			Preference: corev1.NodeSelectorTerm{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: corev1.NodeSelectorOpIn,
+						Values:   []string{nd.name},
+					},
+				},
+			},
+		}
+		preferences = append(preferences, term)
+	}
+
+	// 9. 注入到Pod的Affinity中
+	if pod.Spec.Affinity == nil {
+		pod.Spec.Affinity = &corev1.Affinity{}
+	}
+	if pod.Spec.Affinity.NodeAffinity == nil {
+		pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+
+	// 将距离偏好添加到现有偏好的前面
+	existingPreferences := pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+	pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+		preferences,
+		existingPreferences...,
+	)
+
+	log.Info("injected distance preferences", "count", len(preferences))
+	return nil
+}
+
+// parseCoordinates 解析GeoCoordinates为浮点数
+func parseCoordinates(coords *airforcev1alpha1.GeoCoordinates) (lat, lon float64, err error) {
+	if coords == nil {
+		return 0, 0, fmt.Errorf("coordinates is nil")
+	}
+
+	if coords.Latitude == "" || coords.Longitude == "" {
+		return 0, 0, fmt.Errorf("latitude or longitude is empty")
+	}
+
+	lat, err = strconv.ParseFloat(coords.Latitude, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid latitude: %w", err)
+	}
+
+	lon, err = strconv.ParseFloat(coords.Longitude, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid longitude: %w", err)
+	}
+
+	return lat, lon, nil
+}
+
+// haversineDistance 使用Haversine公式计算球面距离（公里）
+func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const earthRadiusKm = 6371.0
+
+	// 转换为弧度
+	lat1Rad := lat1 * math.Pi / 180
+	lat2Rad := lat2 * math.Pi / 180
+	deltaLat := (lat2 - lat1) * math.Pi / 180
+	deltaLon := (lon2 - lon1) * math.Pi / 180
+
+	// Haversine公式
+	a := math.Sin(deltaLat/2)*math.Sin(deltaLat/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*
+			math.Sin(deltaLon/2)*math.Sin(deltaLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return earthRadiusKm * c
+}
+
+// distanceToWeight 将距离转换为调度权重（5-100）
+func distanceToWeight(distanceKm float64) int32 {
+	weight := 100 - int32(distanceKm/10)
+	if weight < 5 {
+		weight = 5
+	}
+	if weight > 100 {
+		weight = 100
+	}
+	return weight
 }
 
 // SetupWithManager sets up the controller with the Manager.
