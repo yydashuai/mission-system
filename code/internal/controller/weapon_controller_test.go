@@ -77,8 +77,11 @@ var _ = Describe("Weapon Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			By("Verifying status phase is set to available")
+			fetched := &airforcev1alpha1.Weapon{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, fetched)).To(Succeed())
+			Expect(fetched.Status.Phase).To(Equal(airforcev1alpha1.WeaponPhaseAvailable))
 		})
 	})
 })

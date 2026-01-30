@@ -35,20 +35,20 @@ const emptyTask = {
 
 const statusOptions = [
   { value: 'all', label: '全部' },
-  { value: 'Running', label: '执行中' },
-  { value: 'Scheduled', label: '已调度' },
-  { value: 'Pending', label: '待调度' },
-  { value: 'Succeeded', label: '已完成' },
-  { value: 'Failed', label: '失败' },
+  { value: '待执行', label: '待执行' },
+  { value: '已调度', label: '已调度' },
+  { value: '运行中', label: '运行中' },
+  { value: '已完成', label: '已完成' },
+  { value: '失败', label: '失败' },
 ]
 
 const statusScore = (value) => {
   const key = String(value || '').toLowerCase()
-  if (key === 'succeeded') return 5
-  if (key === 'running') return 4
-  if (key === 'scheduled') return 3
-  if (key === 'pending') return 2
-  if (key === 'failed') return 1
+  if (key === '已完成' || key === 'succeeded') return 5
+  if (key === '运行中' || key === 'running') return 4
+  if (key === '已调度' || key === 'scheduled') return 3
+  if (key === '待执行' || key === 'pending') return 2
+  if (key === '失败' || key === 'failed') return 1
   return 0
 }
 

@@ -49,7 +49,18 @@ type WeaponReconciler struct {
 func (r *WeaponReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	var weapon airforcev1alpha1.Weapon
+	if err := r.Get(ctx, req.NamespacedName, &weapon); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if weapon.Status.Phase == "" {
+		patch := client.MergeFrom(weapon.DeepCopy())
+		weapon.Status.Phase = airforcev1alpha1.WeaponPhaseAvailable
+		if err := r.Status().Patch(ctx, &weapon, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
